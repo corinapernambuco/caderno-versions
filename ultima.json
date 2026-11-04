@@ -1,4 +1,4 @@
 {
- "manifesto": "{\n \"version\": \"1.0.0\",\n \"data\": \"2026-11-04T20:51:31+00:00\",\n \"lanzador_minimo\": \"1.0.0\",\n \"codigo\": {\n  \"url\": \"https://raw.githubusercontent.com/corinapernambuco/caderno-versions/main/codigo/caderno-1.0.0.zip\",\n  \"sha256\": \"114f4ecea06f48e7db992a7f7f32ae8af060e5c37e03a82810b35761d47b2c43\"\n },\n \"notas\": \"Separa publicar código (Linux) e fabricar a app (Mac)\"\n}",
- "firma": "a71Ysq8zZiZEjclMVUmCJSeom/kvTiejx/Cv6GmRXVCS7BhtlpNY5PpJAJfSv6bSXk2GQA/xl5/BslafVp/gAw=="
+ "manifesto": "{\n \"version\": \"1.0.0\",\n \"data\": \"2026-11-04T20:51:31+00:00\",\n \"lanzador_minimo\": \"1.0.0\",\n \"codigo\": {\n  \"url\": \"https://raw.githubusercontent.com/corinapernambuco/caderno-versions/main/codigo/caderno-1.0.0.zip\",\n  \"sha256\": \"114f4ecea06f48e7db992a7f7f32ae8af060e5c37e03a82810b35761d47b2c43\"\n },\n \"notas\": \"Separa publicar código (Linux) e fabricar a app (Mac)\",\n \"app\": {\n  \"url\": \"https://raw.githubusercontent.com/corinapernambuco/caderno-versions/main/Caderno.zip\",\n  \"sha256\": \"2eb4d4cc617bb99528c34a3bc2650741398f297b174d188e816a05384cf039e0\",\n  \"lanzador\": \"1.0.0\"\n }\n}",
+ "firma": "WjaMQ+rcfEyvGMZOSEr5pjTBgeAROAbjOuXAV6FwCWSdzalyYor7YBekvNGqF1GozEBWf2T/kedoJmv7OfOYBA=="
 }
