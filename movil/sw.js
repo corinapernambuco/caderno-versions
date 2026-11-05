@@ -1,7 +1,7 @@
 /* Caderno no iPhone: garda a app no teléfono para que abra sen conexión.
    fabricar_movil.py substitúe VERSION e FICHEIROS ao fabricar. Google (Drive) nunca se garda aquí. */
 'use strict';
-const VERSION = "1.5.2-f29adc284687";
+const VERSION = "1.5.3-8bdcf1196796";
 const FICHEIROS = ["./", "index.html", "config.js", "caderno.zip", "app.js", "app.css", "favicon.svg", "ponte.js", "traballador.js", "movil.css", "manifest.webmanifest", "icona-180.png", "icona-192.png", "icona-512.png", "pyodide/cffi-2.0.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", "pyodide/cryptography-47.0.0-cp314-abi3-pyemscripten_2026_0_wasm32.whl", "pyodide/pycparser-3.0-py3-none-any.whl", "pyodide/pyodide-lock.json", "pyodide/pyodide.asm.mjs", "pyodide/pyodide.asm.wasm", "pyodide/pyodide.mjs", "pyodide/python_stdlib.zip", "pyodide/six-1.17.0-py2.py3-none-any.whl"];
 const CACHE = 'caderno-' + VERSION;
 

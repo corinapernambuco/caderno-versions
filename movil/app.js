@@ -295,19 +295,13 @@
 
   function corSerie(j) { return j < 8 ? `var(--s${j + 1})` : 'var(--s0)'; }
 
-  function probasPesos(v) {
+  // Barra co reparto dos pesos entre as probas (unha cor por proba, coa mesma orde que a táboa).
+  function pilaPesos(v) {
     const total = Math.max(100, v.suma_pesos);
-    const pilla = v.probas.map((p, j) =>
-      `<i style="width:${p.peso / total * 100}%;background:${corSerie(j)}" title="${esc(p.nome)}: ${num(p.peso)} %"></i>`).join('');
-    const lista = v.probas.map((p, j) =>
-      `<div class="pr"><span><i class="dot" style="background:${corSerie(j)}"></i>${esc(p.nome)} <span class="faint">${num(p.peso)} %</span></span><b>${num(p.media, 2)}</b></div>`).join('');
-    return `<div class="stack" role="img" aria-label="Reparto dos pesos entre as probas">${pilla}</div>${lista}`;
+    return `<div class="stack" role="img" aria-label="Reparto dos pesos entre as probas">${v.probas.map((p, j) =>
+      `<i style="width:${p.peso / total * 100}%;background:${corSerie(j)}" title="${esc(p.nome)}: ${num(p.peso)} %"></i>`).join('')}</div>`;
   }
 
-  function asideAvaliacion(v) {
-    return `<section class="box"><h2>Reparto de cualificacións</h2>${reparto(v.resumo)}</section>
-      <section class="box"><h2>Probas e pesos</h2><p class="sub" style="margin:-8px 0 12px;font-size:12px">Media da clase en cada proba (sobre 10)</p>${probasPesos(v)}</section>`;
-  }
 
   function lenda(v) {
     const esp = v.probas.filter(p => p.tipo !== 'nota').map(p => p.tipo === 'acertos'
@@ -353,17 +347,15 @@
         '<button class="btn main" type="button" id="b-primeira-proba">+ Nova proba</button>' +
         (E.clases.length > 1 ? ' <button class="btn" type="button" id="b-importar2">Importar doutra clase…</button>' : ''));
       $('#b-primeira-proba').onclick = () => dialogoProba(null, v.avaliacion);
-      if ($('#b-importar2')) $('#b-importar2').onclick = dialogoImportar;
+      if ($('#b-importar2')) $('#b-importar2').onclick = () => dialogoImportar(v.avaliacion);
       return;
     }
+    // O cadro ocupa todo o ancho; os gráficos están en Estatísticas.
     main().innerHTML = cab + `<div class="cards" id="cards">${tarxetasAvaliacion(v)}</div>
-      <div class="grid2">
-        <section class="box tablebox" aria-label="Cadro de notas">
-          <div class="scroll"><table id="taboa">${taboaAvaliacion(v)}</table></div>
-          <div class="legend">${lenda(v)}</div>
-        </section>
-        <aside id="aside">${asideAvaliacion(v)}</aside>
-      </div>`;
+      <section class="box tablebox" aria-label="Cadro de notas">
+        <div class="scroll"><table id="taboa">${taboaAvaliacion(v)}</table></div>
+        <div class="legend">${lenda(v)}</div>
+      </section>`;
     const taboa = $('#taboa');
     taboa.addEventListener('change', ev => { if (ev.target.matches('.in')) garda(ev.target); });
     taboa.addEventListener('keydown', teclaCela);
@@ -462,7 +454,6 @@
       $('.fin-cel', tr).innerHTML = chipFinal(f.redondeada);
     });
     $('#cards').innerHTML = tarxetasAvaliacion(v);
-    $('#aside').innerHTML = asideAvaliacion(v);
     $('#sub').innerHTML = subAvaliacion(v);
   }
 
@@ -493,24 +484,18 @@
       h += `<td class="nota">${num(f.media, 2)}</td><td>${chipFinal(f.redondeada)}</td></tr>`;
     });
     h += '</tbody>';
-    const porAv = v.por_avaliacion.map((a, i) =>
-      `<div class="pr"><span>${NOMES_AV[i + 1]} <span class="faint">${a.n ? 'aprob. ' + pct(a.aprobados, a.n) : 'sen notas'}</span></span><b>${num(a.media, 2)}</b></div>`).join('');
     main().innerHTML = cab + `<div class="cards">${tarxetas([
       ['Media final', num(r.media, 2), 'sen redondear', ''],
       ['Aprobados', pct(r.aprobados, r.n), r.n ? `${r.aprobados} de ${plural(r.n, 'alumno', 'alumnos')}` : 'aínda sen notas', 'acc'],
       ['Suspensos', r.n - r.aprobados, 'final redondeada por debaixo de 5', 'bad'],
       ['Avaliacións con notas', `${conNotas} de 3`, 'só contan as que teñen nota', ''],
     ])}</div>
-      <div class="grid2">
-        <section class="box tablebox" aria-label="Notas finais">
-          <div class="scroll"><table>${h}</table></div>
-          <div class="legend"><span><i class="sw" style="background:var(--bad-bg);box-shadow:inset 0 0 0 1px var(--bad-line)"></i>Avaliación suspensa</span>
-            <span>Cada avaliación: nota sen redondear → redondeada</span>
-            <span class="faint">Unha avaliación só conta se o alumno ten algunha nota nela</span></div>
-        </section>
-        <aside><section class="box"><h2>Reparto da nota final</h2>${reparto(r)}</section>
-          <section class="box"><h2>Media por avaliación</h2>${porAv}</section></aside>
-      </div>`;
+      <section class="box tablebox" aria-label="Notas finais">
+        <div class="scroll"><table>${h}</table></div>
+        <div class="legend"><span><i class="sw" style="background:var(--bad-bg);box-shadow:inset 0 0 0 1px var(--bad-line)"></i>Avaliación suspensa</span>
+          <span>Cada avaliación: nota sen redondear → redondeada</span>
+          <span class="faint">Unha avaliación só conta se o alumno ten algunha nota nela</span></div>
+      </section>`;
   }
 
   // --- alumnado ----------------------------------------------------------------------
@@ -616,8 +601,7 @@
   async function pintaProbas(t) {
     const d = await api('GET', `/api/clases/${E.clase.id}/probas`);
     if (t !== E.nav) return;
-    let h = cabeceira('Probas', 'En cada avaliación os pesos deben sumar 100 %. Preme o nome dunha proba no cadro de notas para editala.',
-      E.clases.length > 1 ? '<button class="btn" type="button" id="b-importar">Importar doutra clase…</button>' : '');
+    let h = cabeceira('Probas', 'En cada avaliación os pesos deben sumar 100 %. Preme o nome dunha proba no cadro de notas para editala.');
     [1, 2, 3].forEach(av => {
       const ps = d.probas.filter(p => p.avaliacion === av);
       const suma = ps.reduce((s, p) => s + p.peso, 0);
@@ -625,7 +609,7 @@
         : `<span class="etq malo">⚠ pesos: ${num(suma)} %</span>`;
       const traer = ps.some(p => p.deberes) ? '' : `<button class="btn peq" type="button" data-deberes="${av}" title="Unha proba coa nota dos deberes desta avaliación">Traer deberes</button>`;
       h += `<section class="box"><div class="cab-box"><div class="row"><h2>${NOMES_AV[av]}</h2>${etq}</div>
-        <div class="row">${traer}<button class="btn peq" type="button" data-nova="${av}">+ Nova proba</button></div></div>`;
+        <div class="row">${E.clases.length > 1 ? `<button class="btn peq" type="button" data-importar="${av}">Importar doutra clase…</button>` : ''}${traer}<button class="btn peq" type="button" data-nova="${av}">+ Nova proba</button></div></div>`;
       if (!ps.length) {
         h += '<p class="baleiro" style="padding:16px">Sen probas.</p></section>';
         return;
@@ -645,13 +629,13 @@
       h += '</tbody></table></div></section>';
     });
     main().innerHTML = `<div class="pila" id="probas">${h}</div>`;
-    if ($('#b-importar')) $('#b-importar').onclick = dialogoImportar;
     $('#probas').onclick = async ev => {
       const b = ev.target.closest('button');
       if (!b) return;
       const p = d.probas.find(x => x.id === Number(b.dataset.editar || b.dataset.eliminar || b.dataset.mover));
       if (b.dataset.nova) dialogoProba(null, Number(b.dataset.nova));
       else if (b.dataset.deberes) dialogoProbaDeberes(Number(b.dataset.deberes));
+      else if (b.dataset.importar) dialogoImportar(Number(b.dataset.importar));
       else if (b.dataset.editar) dialogoProba(p);
       else if (b.dataset.eliminar) eliminaProba(p);
       else if (b.dataset.mover) {
@@ -660,76 +644,74 @@
     };
   }
 
-  // Trae as probas (nome, tipo, peso) doutra clase, tamén de cursos anteriores: os esquemas repítense.
-  async function dialogoImportar() {
+  // Trae ás probas dunha avaliación as doutra clase, tamén de cursos anteriores: os esquemas repítense.
+  async function dialogoImportar(av) {
     let actuais;
-    try { actuais = (await api('GET', `/api/clases/${E.clase.id}/probas`)).probas; } catch (e) { return toast(e.message, true); }
+    try { actuais = (await api('GET', `/api/clases/${E.clase.id}/probas`)).probas.filter(p => p.avaliacion === av); } catch (e) { return toast(e.message, true); }
     const outras = cursos().map(g => ({ ...g, clases: g.clases.filter(x => x.id !== E.clase.id) })).filter(g => g.clases.length);
     if (!outras.length) return toast('Non hai outras clases das que importar.', true);
+    const notas = actuais.reduce((s, p) => s + p.postas, 0);
     const orixe = { probas: null };
-    const resumoAv = (ps) => ps.length ? ps.map(p => `${esc(p.nome)} <span class="faint">${num(p.peso)} %</span>`).join(' · ') : '<span class="faint">sen probas</span>';
     const r = await dialogo({
-      titulo: 'Importar probas doutra clase',
+      titulo: `Importar probas á ${NOMES_AV[av]}`,
       boton: 'Importar',
-      html: `<label class="campo"><span>Clase de orixe</span><select name="de"><option value="">Escolle unha clase…</option>
-          ${outras.map(g => `<optgroup label="Curso ${esc(g.etiqueta)}">${g.clases.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.materia)}</option>`).join('')}</optgroup>`).join('')}</select>
-          <small>Cópianse o nome, o tipo e o peso de cada proba; nin notas nin datas.</small></label>
-        <fieldset class="campo" id="imp-avs" hidden><legend>Que avaliacións</legend><div id="imp-lista"></div></fieldset>
-        <fieldset class="campo" id="imp-modo" hidden><legend>As probas que xa ten ${esc(E.clase.nome)}</legend>
+      html: `<div class="fila3">
+          <label class="campo"><span>Doutra clase</span><select name="de"><option value="">Escolle unha clase…</option>
+            ${outras.map(g => `<optgroup label="Curso ${esc(g.etiqueta)}">${g.clases.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.materia)}</option>`).join('')}</optgroup>`).join('')}</select></label>
+          <label class="campo"><span>Avaliación de orixe</span><select name="de_avaliacion">${[1, 2, 3].map(a =>
+            `<option value="${a}" ${a === av ? 'selected' : ''}>${NOMES_AV[a]}</option>`).join('')}</select></label>
+        </div>
+        <div class="vista-previa" id="imp-previa" hidden></div>
+        <small class="faint">Cópianse o nome, o tipo e o peso de cada proba; nin notas nin datas.</small>
+        ${actuais.length ? `<fieldset class="campo"><legend>As ${plural(actuais.length, 'proba', 'probas')} que xa ten a ${NOMES_AV[av]}</legend>
           <label class="radio"><input type="radio" name="modo" value="engadir" checked><span>Conservalas e engadir as importadas ao final</span></label>
           <label class="radio"><input type="radio" name="modo" value="substituir"><span>Substituílas polas importadas</span></label>
-          <p class="muted" id="imp-aviso" style="margin:4px 0 0;font-size:13px"></p>
-          <label class="radio" id="imp-confirma" hidden><input type="checkbox" name="confirma"><span id="imp-confirma-txt"></span></label>
-        </fieldset>`,
+          <p id="imp-aviso" style="margin:4px 0 0;font-size:13px"></p>
+          <label class="radio" id="imp-confirma" hidden><input type="checkbox" name="confirma"><span>Entendo que se borran ${plural(notas, 'nota', 'notas')}</span></label>
+        </fieldset>` : ''}`,
       aoAbrir(form) {
-        const avsMarcadas = () => $$('input[name=av]:checked', form).map(i => Number(i.value));
         const actualiza = () => {
-          if (!orixe.probas) return;
-          const avs = avsMarcadas();
-          const subst = form.modo.value === 'substituir';
-          const afectadas = actuais.filter(p => avs.includes(p.avaliacion));
-          const notas = afectadas.reduce((s, p) => s + p.postas, 0);
-          $('#imp-modo', form).hidden = !afectadas.length;
-          let aviso = '';
-          if (subst) {
-            aviso = afectadas.length ? `Bórranse ${plural(afectadas.length, 'proba', 'probas')}${notas ? ` e ${plural(notas, 'nota posta', 'notas postas')} nelas` : ''}. Non se pode desfacer.` : '';
-          } else {
-            const sumas = avs.map(a => {
-              const total = [...actuais, ...orixe.probas].filter(p => p.avaliacion === a).reduce((s, p) => s + p.peso, 0);
-              return sumaPesosOk(total) ? '' : `${NOMES_AV[a]}: os pesos sumarán ${num(total)} %`;
-            }).filter(Boolean);
-            aviso = sumas.length ? '⚠ ' + sumas.join(' · ') + '. Despois podes axustalos ou eliminar as que sobren.' : '';
+          const ps = orixe.probas ? orixe.probas.filter(p => p.avaliacion === Number(form.de_avaliacion.value)) : null;
+          const previa = $('#imp-previa', form);
+          previa.hidden = !ps;
+          if (ps) {
+            const suma = ps.reduce((s, p) => s + p.peso, 0);
+            previa.innerHTML = ps.length ? `<table><tbody>${ps.map(p => `<tr><td>${esc(p.nome)}</td><td class="faint">${tipoProba(p)}</td><td>${num(p.peso)} %</td></tr>`).join('')}
+              <tr><td class="faint">Total</td><td></td><td><b>${num(suma)} %</b></td></tr></tbody></table>` : '<p class="muted" style="margin:8px">Esa avaliación non ten probas.</p>';
           }
-          $('#imp-aviso', form).textContent = aviso;
-          $('#imp-aviso', form).className = subst && notas ? 'malo' : 'muted';
+          if (!actuais.length) return;
+          const subst = form.modo.value === 'substituir';
+          const aviso = $('#imp-aviso', form);
+          let txt = '';
+          if (subst) txt = `Bórranse ${plural(actuais.length, 'proba', 'probas')}${notas ? ` e ${plural(notas, 'nota posta', 'notas postas')} nelas` : ''}. Non se pode desfacer.`;
+          else if (ps && ps.length) {
+            const total = [...actuais, ...ps].reduce((s, p) => s + p.peso, 0);
+            if (!sumaPesosOk(total)) txt = `⚠ Os pesos sumarán ${num(total)} %. Despois podes axustalos ou eliminar as que sobren.`;
+          }
+          aviso.textContent = txt;
+          aviso.className = subst && notas ? 'malo' : 'muted';
           $('#imp-confirma', form).hidden = !(subst && notas);
-          $('#imp-confirma-txt', form).textContent = `Entendo que se borran ${plural(notas, 'nota', 'notas')}`;
         };
         form.de.addEventListener('change', async () => {
           orixe.probas = null;
-          $('#imp-avs', form).hidden = $('#imp-modo', form).hidden = true;
-          if (!form.de.value) return;
-          try { orixe.probas = (await api('GET', `/api/clases/${form.de.value}/probas`)).probas; } catch (e) { return toast(e.message, true); }
-          $('#imp-lista', form).innerHTML = [1, 2, 3].map(a => {
-            const ps = orixe.probas.filter(p => p.avaliacion === a);
-            return `<label class="radio"><input type="checkbox" name="av" value="${a}" ${ps.length ? 'checked' : 'disabled'}><span><b>${NOMES_AV[a]}</b><br><small>${resumoAv(ps)}</small></span></label>`;
-          }).join('');
-          $('#imp-avs', form).hidden = false;
+          if (form.de.value) {
+            try { orixe.probas = (await api('GET', `/api/clases/${form.de.value}/probas`)).probas; } catch (e) { toast(e.message, true); }
+          }
           actualiza();
         });
         form.addEventListener('change', ev => { if (ev.target.name !== 'de') actualiza(); });
+        actualiza();
       },
       async aoEnviar(form) {
         if (!form.de.value || !orixe.probas) throw new Error('Escolle a clase de orixe.');
-        const avs = $$('input[name=av]:checked', form).map(i => Number(i.value));
-        if (!avs.length) throw new Error('Escolle polo menos unha avaliación con probas.');
-        const substituir = !$('#imp-modo', form).hidden && form.modo.value === 'substituir';
-        if (substituir && !$('#imp-confirma', form).hidden && !form.confirma.checked) throw new Error('Marca a confirmación: bórranse notas.');
-        return api('POST', `/api/clases/${E.clase.id}/probas/importar`, { de: Number(form.de.value), avaliacions: avs, substituir });
+        const substituir = !!actuais.length && form.modo.value === 'substituir';
+        if (substituir && notas && !form.confirma.checked) throw new Error('Marca a confirmación: bórranse notas.');
+        return api('POST', `/api/clases/${E.clase.id}/probas/importar`,
+          { de: Number(form.de.value), de_avaliacion: Number(form.de_avaliacion.value), avaliacion: av, substituir });
       },
     });
     if (!r) return;
-    toast(`${plural(r.importadas, 'proba importada', 'probas importadas')}` + (r.saltadas ? ` (${r.saltadas} de deberes non, porque xa había)` : ''));
+    toast(`${plural(r.importadas, 'proba importada', 'probas importadas')}` + (r.saltadas ? ' (a de deberes non, porque xa había unha)' : ''));
     navega();
   }
 
@@ -942,15 +924,13 @@
       return;
     }
     main().innerHTML = cab + `<div class="cards" id="cards">${tarxetasDeberes(v)}</div>
-      <div class="grid2">
-        <section class="box tablebox" aria-label="Deberes">
-          <div class="scroll" id="scroll-deberes"><table id="taboa-deberes" class="deberes">${taboaDeberes(v)}</table></div>
-          <div class="legend"><span><i class="sw dm-sw si"></i>Feitos</span><span><i class="sw dm-sw non"></i>Non feitos</span>
-            <span><i class="sw dm-sw"></i>Sen marcar (non conta: faltou, xustificado…)</span>
-            <span class="faint">Toque: feitos → non → sen marcar · Teclas: S feitos, N non, Supr borrar, frechas para moverse · Preme a data (✎) para cambiala ou eliminar a columna</span></div>
-        </section>
-        <aside id="aside">${asideDeberes(v)}</aside>
-      </div>`;
+      <section class="box tablebox" aria-label="Deberes">
+        <div class="scroll" id="scroll-deberes"><table id="taboa-deberes" class="deberes">${taboaDeberes(v)}</table></div>
+        <div class="legend"><span><i class="sw dm-sw si"></i>Feitos</span><span><i class="sw dm-sw non"></i>Non feitos</span>
+          <span><i class="sw dm-sw"></i>Sen marcar (non conta: faltou, xustificado…)</span>
+          <span class="faint">Toque: feitos → non → sen marcar · Teclas: S feitos, N non, Supr borrar, frechas para moverse · Preme a data (✎) para cambiala ou eliminar a columna</span></div>
+      </section>
+      <div class="paneis" id="aside">${asideDeberes(v)}</div>`;
     // Vense os últimos deberes e, se collen, os totais (no iPhone, a última columna xusto despois do nome).
     const sc = $('#scroll-deberes');
     const ult = $$('#taboa-deberes th.th-deber').pop();
@@ -1168,10 +1148,10 @@
     }
     let detalle;
     if (va) {
-      detalle = `<section class="box"><div class="cab-box"><h2>Por proba</h2></div><div class="scroll"><table><thead><tr>
+      detalle = `<section class="box"><div class="cab-box"><h2>Por proba</h2></div>${va.probas.length ? `<div style="padding:14px 16px 0">${pilaPesos(va)}</div>` : ''}<div class="scroll"><table><thead><tr>
         <th class="l" style="padding-left:14px">Proba</th><th>Peso</th><th>Media</th><th>Mín.</th><th>Máx.</th>
         <th>&lt; ${num(v.clase.minimo_proba)}</th><th>Pendentes</th></tr></thead><tbody>${va.probas.map(p => `<tr>
-        <td class="l name" style="padding-left:14px">${esc(p.nome)} <span class="faint">${tipoProba(p).toLowerCase()}</span></td><td>${num(p.peso)} %</td>
+        <td class="l name" style="padding-left:14px"><i class="dot" style="background:${corSerie(va.probas.indexOf(p))}"></i>${esc(p.nome)} <span class="faint">${tipoProba(p).toLowerCase()}</span></td><td>${num(p.peso)} %</td>
         <td><b>${num(p.media, 2)}</b></td><td>${num(p.minima, 2)}</td><td>${num(p.maxima, 2)}</td>
         <td class="${p.baixo ? 'malo' : 'muted'}">${p.baixo}</td><td class="${p.pendentes ? '' : 'muted'}">${p.pendentes}</td></tr>`).join('')}</tbody></table></div></section>`;
     } else {
@@ -1202,6 +1182,7 @@
         </div>
         <aside>
           <section class="box"><h2>Evolución</h2><p class="sub" style="margin:-8px 0 8px;font-size:12px">Media sen redondear e porcentaxe de aprobados</p>${evol}</section>
+          <section class="box"><h2>Reparto de cualificacións</h2>${reparto(r)}</section>
           <section class="box"><h2>Por debaixo de 5</h2>${listaSuspensos(v.filas, nota, det)}</section>
         </aside>
       </div>`;

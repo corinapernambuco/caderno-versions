@@ -63,7 +63,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,te
 
 /* estrutura */
 .wrap{display:flex;flex-wrap:wrap;align-items:flex-start;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav{flex:1 1 200px;max-width:230px;padding:20px 12px;display:flex;flex-direction:column;gap:2px}
+nav{flex:1 1 170px;max-width:190px;padding:20px 8px 20px 10px;display:flex;flex-direction:column;gap:2px}
 nav a,nav .engadir{display:block;padding:10px 12px;border-radius:8px;color:var(--muted);text-decoration:none;border:0;background:none;text-align:left;width:100%}
 nav a:hover,nav .engadir:hover{color:var(--fg);background:var(--line2)}
 nav a.on{background:var(--panel);color:var(--accent);font-weight:600;box-shadow:0 0 0 1px var(--line)}
@@ -101,6 +101,7 @@ h2{margin:0 0 12px;font-size:15px}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:12px}
 .box.pad{padding:16px}
 .tablebox{flex:999 1 620px;min-width:0;overflow:hidden}
+main>.tablebox{flex:none}
 .columna{flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:16px}
 .pila{display:flex;flex-direction:column;gap:16px}
 .scroll{overflow-x:auto}
@@ -174,7 +175,9 @@ table.deberes tfoot td.sticky1,table.deberes tfoot td.sticky2{background:var(--s
 
 /* resumo lateral e gráficos */
 aside{flex:1 1 280px;min-width:0;display:flex;flex-direction:column;gap:16px}
-aside .box{padding:16px}
+aside .box,.paneis .box{padding:16px}
+/* paneis de resumo debaixo dunha táboa (deberes) */
+.paneis{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;align-items:start}
 .bars{display:flex;flex-direction:column;gap:10px}
 .bar{display:grid;grid-template-columns:100px minmax(0,1fr) 24px;gap:10px;align-items:center;font-size:13px}
 .bar b{text-align:right;font-variant-numeric:tabular-nums}
@@ -261,7 +264,7 @@ nav .anteriores summary{padding:8px 12px;font-size:13px;color:var(--muted);curso
 /* Só consulta: o iPhone en modo consulta (so-consulta) e os cursos xa rematados (curso-pechado). */
 body.so-consulta #b-nova-clase,
 body.so-consulta section:has(#b-eliminar-curso),
-:is(body.so-consulta,body.curso-pechado) :is(#b-nova,#b-primeira-proba,#b-engadir,#b-engadir2,[data-nova],[data-editar],[data-eliminar],[data-mover],#f-axustes button[type=submit],#b-pedir,#b-pedir2,[data-deberes],[data-todos],#b-importar,#b-importar2),
+:is(body.so-consulta,body.curso-pechado) :is(#b-nova,#b-primeira-proba,#b-engadir,#b-engadir2,[data-nova],[data-editar],[data-eliminar],[data-mover],#f-axustes button[type=submit],#b-pedir,#b-pedir2,[data-deberes],[data-todos],[data-importar],#b-importar2),
 :is(body.so-consulta,body.curso-pechado) section:has(#b-eliminar-clase){display:none}
 body.so-consulta #b-primeira{display:none}
 :is(body.so-consulta,body.curso-pechado) :is(.in,.th-proba,.dm,#f-axustes input){pointer-events:none}
@@ -302,7 +305,7 @@ body.informe main{max-width:1100px;margin:0 auto}
    translúcida (a xanela pon o material de macOS detrás), letra e tamaños do sistema, cor de acento do usuario. */
 :root.mac{--font:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
 @supports (color:AccentColor){:root.mac{--accent:AccentColor;--accent-fg:AccentColorText;--accent-soft:color-mix(in srgb,AccentColor 16%,var(--panel))}}
-.mac body{font-size:13px;-webkit-font-smoothing:antialiased;background:transparent;display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:auto auto auto 1fr;min-height:100vh}
+.mac body{font-size:13px;-webkit-font-smoothing:antialiased;background:transparent;display:grid;grid-template-columns:190px minmax(0,1fr);grid-template-rows:auto auto auto 1fr;min-height:100vh}
 .mac .wrap{display:contents}
 .mac nav{grid-column:1;grid-row:1/-1;max-width:none;position:sticky;top:0;height:100vh;overflow:auto;padding:52px 10px 16px;background:transparent;border-right:1px solid var(--line)}
 .mac nav a,.mac nav .engadir{padding:6px 10px;border-radius:6px}
