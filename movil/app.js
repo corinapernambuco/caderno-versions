@@ -996,7 +996,10 @@
         </div>
         <details class="mais"><summary>Máis opcións</summary>
           <label class="radio"><input type="checkbox" data-accion="modo" ${s.edicion ? 'checked' : ''}><span>Permitir cambios neste iPhone <small class="muted">(se o desmarcas, só se poden consultar as notas)</small></span></label>
-          ${s.google ? '<div class="botoes" style="justify-content:flex-start"><button class="btn perigo" type="button" data-accion="google-desconectar">Desconectar a conta de Google</button></div>' : ''}
+          <div class="botoes" style="justify-content:flex-start">
+            ${s.google ? '<button class="btn" type="button" data-accion="google-desconectar">Desconectar a conta de Google</button>' : ''}
+            <button class="btn perigo" type="button" data-accion="borrar-iphone">Borrar os datos deste iPhone</button>
+          </div>
           <p class="faint" style="font-size:12px;margin:8px 0 0">Versión ${esc(s.version)}</p>
         </details></section>`;
   }
@@ -1021,6 +1024,7 @@
 
   async function accionMovil(accion, boton) {
     const P = window.CadernoPonte;
+    const si = E.sistema.sincronizacion;
     try {
       if (accion === 'clave-movil') return dialogoClaveMovil();
       if (accion === 'google') return await P.conectaGoogle();
@@ -1036,6 +1040,11 @@
         const res = r && r.resultado;
         toast(({ ao_dia: 'Xa estaba todo ao día', subido: 'Cambios enviados', baixado: 'Traídos os cambios do Mac',
           conflito: 'Hai cambios en dous sitios: escolle cales conservar' })[res] || 'Non se puido sincronizar: comproba a conexión', !res || res === 'conflito' || res.startsWith('sen') || res === 'erro');
+      } else if (accion === 'borrar-iphone') {
+        boton.disabled = false;
+        const aviso = si.pendente ? ' Ollo: hai cambios deste iPhone que aínda non se enviaron ao Mac e perderanse.' : '';
+        if (!(await confirma('Borrar os datos deste iPhone', 'Bórranse deste iPhone as clases, as notas, a clave e a conexión con Google, como se se instalase de novo. O Mac e as copias de Google Drive non se tocan.' + aviso, 'Borrar'))) return;
+        return await P.borraTodo();
       } else if (accion === 'google-desconectar') {
         boton.disabled = false;
         if (!(await confirma('Desconectar Google', 'Este iPhone deixará de intercambiar datos co Mac. Os datos que xa ten quedan nel.', 'Desconectar'))) return;

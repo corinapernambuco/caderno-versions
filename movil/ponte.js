@@ -134,6 +134,16 @@
     if (g) fetch(GOOGLE.revoke, { method: 'POST', body: new URLSearchParams({ token: g.refresh }) }).catch(() => {});
   }
 
+  // Deixa o iPhone como recén instalado (os datos do Mac e as copias de Drive non se tocan).
+  async function borraTodo() {
+    await desconectaGoogle();
+    const r = await chama('POST', '/api/movil/borrar', { confirmar: true });
+    if (r.status !== 200) throw new Error((r.datos && r.datos.erro) || 'Non se puido borrar.');
+    [CHAVE_GOOGLE, CHAVE_PENDENTE].forEach(lsDel);
+    try { localStorage.clear(); } catch (e) { /* sen almacenamento */ }
+    location.replace(redireccion());
+  }
+
   // --- sincronización -------------------------------------------------------------------
   let temporizador = null;
   let enCurso = null;
@@ -187,7 +197,7 @@
 
   const volta = completaVolta();
   window.CadernoPonte = {
-    api, descarga, conectaGoogle, desconectaGoogle, sincroniza,
+    api, descarga, conectaGoogle, desconectaGoogle, sincroniza, borraTodo,
     googleConfigurado: configurado,
     // Resultado da volta de Google (null se non se vén de alí); despois sincroniza.
     volta: volta.then(r => { sincroniza(); return r; }),
