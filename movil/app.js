@@ -167,6 +167,7 @@
     const sel = $('#sel-clase');
     sel.hidden = !c;
     $('#accions').hidden = !c;
+    $('#b-nova').hidden = E.seccion !== 'probas';
     $('#curso').textContent = c ? 'Curso ' + c.curso + (pechada(c) ? ' · pechado' : '') : '';
     const gs = cursos();
     const opcion = x => `<option value="${x.id}" ${c && x.id === c.id ? 'selected' : ''}>${esc(x.nome)} · ${esc(x.materia)}</option>`;
@@ -861,7 +862,7 @@
   function taboaDeberes(v) {
     let h = `<thead><tr><th class="l sticky1" style="padding-left:14px">Nº</th><th class="l sticky2">Alumno/a</th>`;
     v.deberes.forEach((d, j) => {
-      h += `<th class="th-deber"><button type="button" class="th-proba" data-editar-deber="${j}" title="${esc(d.descricion || 'Editar ou cambiar a data')}">${diaMes(d.data)}</button>
+      h += `<th class="th-deber"><button type="button" class="th-proba" data-editar-deber="${j}" title="Cambiar a data ou o texto, ou eliminar estes deberes">${diaMes(d.data)} <span class="lapis" aria-hidden="true">✎</span></button>
         <span class="m">${diaSemana(d.data)}${d.descricion ? ' · ' + esc(d.descricion.length > 14 ? d.descricion.slice(0, 13) + '…' : d.descricion) : ''}</span>
         <button type="button" class="todos" data-todos="${j}" ${d.pendentes ? '' : 'hidden'} title="Marcar como feitos os que aínda non teñen marca">✓ resto</button></th>`;
     });
@@ -946,7 +947,7 @@
           <div class="scroll" id="scroll-deberes"><table id="taboa-deberes" class="deberes">${taboaDeberes(v)}</table></div>
           <div class="legend"><span><i class="sw dm-sw si"></i>Feitos</span><span><i class="sw dm-sw non"></i>Non feitos</span>
             <span><i class="sw dm-sw"></i>Sen marcar (non conta: faltou, xustificado…)</span>
-            <span class="faint">Toque: feitos → non → sen marcar · Teclas: S feitos, N non, Supr borrar, frechas para moverse</span></div>
+            <span class="faint">Toque: feitos → non → sen marcar · Teclas: S feitos, N non, Supr borrar, frechas para moverse · Preme a data (✎) para cambiala ou eliminar a columna</span></div>
         </section>
         <aside id="aside">${asideDeberes(v)}</aside>
       </div>`;

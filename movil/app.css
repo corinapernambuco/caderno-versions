@@ -145,6 +145,8 @@ td.nota{color:var(--muted)}
 /* deberes: un botón grande por cela; un toque cambia sen marcar → feitos → non feitos */
 .in.auto{color:var(--muted);cursor:default;font-style:italic}
 .in.auto:hover{border-color:transparent}
+table.deberes .lapis{font-weight:400;color:var(--faint);font-size:11px}
+table.deberes .th-proba:hover .lapis{color:var(--accent)}
 table.deberes th.th-deber{min-width:62px;vertical-align:bottom}
 table.deberes .todos{display:block;margin:4px auto 0;border:1px solid var(--line);background:var(--panel);border-radius:6px;font-size:11px;padding:2px 6px;color:var(--ok-fg);font-weight:600}
 table.deberes .todos:hover{border-color:currentColor}
