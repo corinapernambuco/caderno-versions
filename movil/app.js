@@ -8,7 +8,7 @@
   // Reparto: Insuficiente en estado crítico; o resto, rampla ordinal dun só ton.
   const CORES_REPARTO = ['--crit', '--o1', '--o2', '--o3', '--o4'];
 
-  const E = { clases: [], cursoActual: '', clase: null, seccion: null, vista: null, nav: 0, ultimaAv: '1' };
+  const E = { clases: [], cursoActual: '', clase: null, seccion: null, vista: null, nav: 0, ultimaAv: '1', desbloqueadas: new Set() };
   let cola = Promise.resolve();
 
   const $ = (s, el = document) => el.querySelector(s);
@@ -43,6 +43,9 @@
   function sumaPesosOk(s) { return Math.abs(s - 100) < 1e-9; }
 
   async function api(metodo, url, corpo) {
+    if (metodo !== 'GET' && bloqueada() && /^\/api\/(clases\/\d+|alumnos|probas|cualificacions|comportamentos)/.test(url)) {
+      throw new Error(`O curso ${E.clase.curso} está pechado: preme «Permitir cambios» para modificalo.`);
+    }
     // No iPhone non hai servidor: o mesmo código Python corre no navegador (movil/ponte.js).
     if (window.CadernoPonte) return window.CadernoPonte.api(metodo, url, corpo);
     const opts = { method: metodo, headers: { Accept: 'application/json' } };
@@ -79,6 +82,25 @@
   function avValida(a) { return ['1', '2', '3', 'final'].includes(a) ? a : null; }
   function avNumerica() { return ['1', '2', '3'].includes(E.ultimaAv) ? Number(E.ultimaAv) : 1; }
 
+  // --- cursos: cada curso agrupa todas as súas clases; os xa rematados quedan só para consulta ---
+  function anoCurso(t) { const m = /^\s*(\d{4})/.exec(t || ''); return m ? Number(m[1]) : null; }
+  function etiquetaCurso(ano) { return ano == null ? 'Sen curso' : `${ano}–${String(ano + 1).slice(-2)}`; }
+  function pechada(c) {
+    const a = anoCurso(c.curso), actual = anoCurso(E.cursoActual);
+    return a != null && actual != null && a < actual;
+  }
+  function bloqueada() { return !!(E.clase && pechada(E.clase) && !E.desbloqueadas.has(E.clase.id)); }
+  // [{ano, etiqueta, pechado, clases}], do curso máis novo ao máis antigo.
+  function cursos() {
+    const grupos = new Map();
+    E.clases.forEach(c => {
+      const a = anoCurso(c.curso);
+      if (!grupos.has(a)) grupos.set(a, { ano: a, etiqueta: etiquetaCurso(a), pechado: pechada(c), clases: [] });
+      grupos.get(a).clases.push(c);
+    });
+    return [...grupos.values()].sort((x, y) => (y.ano ?? 9999) - (x.ano ?? 9999));
+  }
+
   async function cargaClases() {
     const d = await api('GET', '/api/clases');
     E.clases = d.clases;
@@ -97,9 +119,11 @@
     const c = E.clases.find(x => x.id === r.clase);
     if (!c) {
       const gardada = E.clases.find(x => x.id === Number(lsGet('caderno.clase')));
-      location.replace(href(r.clase ? 'notas' : r.seccion, r.clase ? null : r.arg, (gardada || E.clases[0]).id));
+      const porDefecto = gardada || E.clases.find(x => !pechada(x)) || E.clases[0];
+      location.replace(href(r.clase ? 'notas' : r.seccion, r.clase ? null : r.arg, porDefecto.id));
       return;
     }
+    if (E.clase && E.clase.id !== c.id) E.desbloqueadas.clear();
     E.clase = c;
     E.seccion = r.seccion;
     lsSet('caderno.clase', c.id);
@@ -133,14 +157,39 @@
     const sel = $('#sel-clase');
     sel.hidden = !c;
     $('#accions').hidden = !c;
-    $('#curso').textContent = c ? 'Curso ' + c.curso : '';
-    sel.innerHTML = E.clases.map(x =>
-      `<option value="${x.id}" ${c && x.id === c.id ? 'selected' : ''}>${esc(x.nome)} · ${esc(x.materia)}</option>`).join('');
+    $('#curso').textContent = c ? 'Curso ' + c.curso + (pechada(c) ? ' · pechado' : '') : '';
+    const gs = cursos();
+    const opcion = x => `<option value="${x.id}" ${c && x.id === c.id ? 'selected' : ''}>${esc(x.nome)} · ${esc(x.materia)}</option>`;
+    sel.innerHTML = gs.length < 2 ? E.clases.map(opcion).join('')
+      : gs.map(g => `<optgroup label="Curso ${esc(g.etiqueta)}${g.pechado ? ' (pechado)' : ''}">${g.clases.map(opcion).join('')}</optgroup>`).join('');
+    document.body.classList.toggle('curso-pechado', bloqueada());
+    let barra = $('#pechado');
+    if (!barra) {
+      barra = document.createElement('div');
+      barra.id = 'pechado';
+      barra.className = 'pechado';
+      $('#avisos').after(barra);
+      barra.addEventListener('click', ev => { if (ev.target.closest('[data-desbloquear]')) desbloquea(); });
+    }
+    barra.hidden = !bloqueada() || E.seccion === 'informe';
+    barra.innerHTML = c ? `<p>Curso ${esc(c.curso)} rematado: só consulta. <button class="btn peq" type="button" data-desbloquear>Permitir cambios</button></p>` : '';
     const sec = E.seccion === 'informe' ? 'notas' : E.seccion;
     $('#nav-seccions').innerHTML = c ? SECCIONS.map(([k, l]) =>
       `<a href="${href(k, ['notas', 'estatisticas'].includes(k) ? E.ultimaAv : null)}" class="${k === sec ? 'on' : ''}" ${k === sec ? 'aria-current="page"' : ''}>${l}</a>`).join('') : '';
-    $('#nav-clases').innerHTML = E.clases.map(x =>
-      `<a href="${href(sec || 'notas', ['notas', 'estatisticas'].includes(sec) ? E.ultimaAv : null, x.id)}" class="${c && x.id === c.id ? 'on' : ''}">${esc(x.nome)}</a>`).join('');
+    const ligazon = x => `<a href="${href(sec || 'notas', ['notas', 'estatisticas'].includes(sec) ? E.ultimaAv : null, x.id)}" class="${c && x.id === c.id ? 'on' : ''}">${esc(x.nome)}</a>`;
+    const activos = gs.filter(g => !g.pechado);
+    const anteriores = gs.filter(g => g.pechado);
+    const titulo = g => (activos.length > 1 || !activos.length ? `<div class="lbl-curso">${esc(g.etiqueta)}</div>` : '');
+    $('#nav-clases').innerHTML = activos.map(g => titulo(g) + g.clases.map(ligazon).join('')).join('')
+      + (anteriores.length ? `<details class="anteriores" ${c && pechada(c) ? 'open' : ''}><summary>Cursos anteriores</summary>
+        ${anteriores.map(g => `<div class="lbl-curso">${esc(g.etiqueta)}</div>${g.clases.map(ligazon).join('')}`).join('')}</details>` : '');
+  }
+
+  async function desbloquea() {
+    const c = E.clase;
+    if (!(await confirma('Permitir cambios', `O curso ${c.curso} xa rematou. Podes modificar ${c.nome} ata que peches o Caderno ou cambies de clase.`, 'Permitir cambios'))) return;
+    E.desbloqueadas.add(c.id);
+    navega();
   }
 
   function cabeceira(titulo, sub, dereita) {
@@ -768,6 +817,7 @@
         <li>Letra de comportamento: ata 2 E, ata 4 D, ata 6 C, ata 8,5 B, máis A.</li>
         <li>Final: media ponderada das avaliacións nas que o alumno ten algunha nota.</li>
       </ul></section>
+      ${pechada(c) ? seccionCursoPechado(c) : ''}
       ${seccionCopias()}
       <section class="box pad"><h2>Eliminar a clase</h2>
         <p class="muted" style="margin:0 0 12px">Bórranse o alumnado, as probas e todas as notas de ${esc(c.nome)}. Non se pode desfacer.</p>
@@ -795,6 +845,7 @@
         navega();
       } catch (e) { $('.erro-form', form).textContent = e.message; }
     };
+    if ($('#b-eliminar-curso')) $('#b-eliminar-curso').onclick = () => eliminaCurso(c);
     $('#b-eliminar-clase').onclick = async () => {
       if (!(await confirma('Eliminar clase', `Eliminarase ${c.nome} con todo o seu alumnado, probas e notas. Non se pode desfacer.`, 'Eliminar clase'))) return;
       try {
@@ -807,6 +858,37 @@
     };
   }
 
+  function seccionCursoPechado(c) {
+    const g = cursos().find(x => x.ano === anoCurso(c.curso));
+    return `<section class="box pad"><h2>Curso ${esc(g.etiqueta)}</h2>
+      <p class="muted" style="margin:0 0 12px">Este curso xa rematou: as súas ${g.clases.length} clases (${g.clases.map(x => esc(x.nome)).join(', ')}) só se poden consultar, salvo que premas «Permitir cambios».</p>
+      <p class="muted" style="margin:0 0 12px">Cando xa non o necesites, podes eliminar o curso enteiro. Se queres conservar algo, exporta antes cada clase a Excel.</p>
+      <button class="btn perigo" type="button" id="b-eliminar-curso">Eliminar o curso ${esc(g.etiqueta)} enteiro</button></section>`;
+  }
+
+  async function eliminaCurso(c) {
+    const g = cursos().find(x => x.ano === anoCurso(c.curso));
+    const ok = await dialogo({
+      titulo: `Eliminar o curso ${g.etiqueta}`,
+      boton: 'Eliminar o curso',
+      perigo: true,
+      html: `<p style="margin:0">Bórranse estas ${g.clases.length} clases, co seu alumnado, probas e notas:</p>
+        <ul style="margin:0">${g.clases.map(x => `<li>${esc(x.nome)} · ${esc(x.materia)}</li>`).join('')}</ul>
+        <p style="margin:0">Non se pode desfacer${sincroniza() ? '. Tamén se borran no outro dispositivo ao sincronizar; as copias de Google Drive desaparecen en dous meses' : ''}.</p>
+        <label class="campo"><span>Para confirmar, escribe <b>${esc(g.etiqueta)}</b></span><input name="confirmar" autocomplete="off"></label>`,
+      async aoEnviar(form) {
+        if (anoCurso(form.confirmar.value) !== g.ano) throw new Error(`Escribe ${g.etiqueta} para confirmar.`);
+        await api('POST', '/api/cursos/eliminar', { curso: g.clases[0].curso });
+        return true;
+      },
+    });
+    if (!ok) return;
+    await cargaClases();
+    toast(`Curso ${g.etiqueta} eliminado`);
+    location.hash = '#/';
+    navega();
+  }
+
   function dialogoClase() {
     return dialogo({
       titulo: 'Nova clase',
@@ -817,7 +899,7 @@
           <label class="campo"><span>Curso</span><input name="curso" maxlength="20" value="${esc(E.cursoActual)}"></label>
         </div>
         ${E.clases.length ? `<label class="campo"><span>Copiar probas e axustes de</span><select name="copiar"><option value="">Ningunha (empezar en branco)</option>
-          ${E.clases.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.materia)}</option>`).join('')}</select>
+          ${cursos().map(g => `<optgroup label="Curso ${esc(g.etiqueta)}">${g.clases.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.materia)}</option>`).join('')}</optgroup>`).join('')}</select>
           <small>Cópianse as probas (nome, tipo e peso), non as notas.</small></label>` : ''}`,
       async aoEnviar(form) {
         const corpo = { nome: form.nome.value, materia: form.materia.value, curso: form.curso.value };

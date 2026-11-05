@@ -214,6 +214,21 @@ dialog .dlg-corpo{padding:16px 20px 20px}
 /* modo aplicación: avisos, clave e copias */
 .avisos{background:var(--wait-bg);color:var(--wait-fg);border-bottom:1px solid var(--wait-line);padding:10px max(16px,env(safe-area-inset-left,0px));font-size:14px;font-weight:500}
 .avisos p{margin:0}
+.pechado{background:var(--line2);border-bottom:1px solid var(--line);padding:8px max(16px,env(safe-area-inset-left,0px));font-size:14px;color:var(--muted)}
+.pechado p{margin:0;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+body.informe .pechado{display:none}
+nav .lbl-curso{margin:10px 12px 2px;font-size:11px;color:var(--faint)}
+nav .anteriores{margin-top:14px}
+nav .anteriores summary{padding:8px 12px;font-size:13px;color:var(--muted);cursor:pointer}
+
+/* Só consulta: o iPhone en modo consulta (so-consulta) e os cursos xa rematados (curso-pechado). */
+body.so-consulta #b-nova-clase,
+body.so-consulta section:has(#b-eliminar-curso),
+:is(body.so-consulta,body.curso-pechado) :is(#b-nova,#b-primeira-proba,#b-engadir,#b-engadir2,[data-nova],[data-editar],[data-eliminar],[data-mover],#f-axustes button[type=submit]),
+:is(body.so-consulta,body.curso-pechado) section:has(#b-eliminar-clase){display:none}
+body.so-consulta #b-primeira{display:none}
+:is(body.so-consulta,body.curso-pechado) :is(.in,.th-proba,#f-axustes input){pointer-events:none}
+:is(body.so-consulta,body.curso-pechado) .in{background:transparent;border-color:transparent}
 body.informe .avisos{display:none}
 .clave{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:17px;letter-spacing:.04em;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px;margin:12px 0;text-align:center;word-break:normal;overflow-wrap:normal;user-select:all;-webkit-user-select:all}
 .lista-copias{max-height:190px;overflow:auto;border:1px solid var(--line2);border-radius:8px;padding:4px 10px}
