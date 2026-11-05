@@ -168,6 +168,17 @@
 
   // --- benvida ---------------------------------------------------------------------
   function pintaBenvida() {
+    // No iPhone, o primeiro é traer os datos do Mac (se se crea antes unha clase, habería conflito).
+    if (esMovil()) {
+      main().innerHTML = cabeceira('Benvido/a ao Caderno', 'Este iPhone aínda non ten datos.') +
+        `<div class="axustes">${seccionMovil(true)}
+        <section class="box pad"><h2>Empezar sen o Mac</h2>
+          <p class="muted" style="margin:0 0 12px">Só se non tes datos no Mac: crea aquí a primeira clase.</p>
+          <button class="btn" type="button" id="b-primeira">+ Nova clase</button></section></div>`;
+      $('#b-primeira').onclick = dialogoClase;
+      escoitaAccions($('.axustes', main()));
+      return;
+    }
     main().innerHTML = cabeceira('Benvido/a ao Caderno', 'Aínda non hai ningunha clase.') +
       baleiro('Crea a túa primeira clase', 'Despois engade o alumnado e as probas de cada avaliación; o caderno calcula as notas.',
         '<button class="btn main" type="button" id="b-primeira">+ Nova clase</button>');
@@ -762,13 +773,7 @@
         <p class="muted" style="margin:0 0 12px">Bórranse o alumnado, as probas e todas as notas de ${esc(c.nome)}. Non se pode desfacer.</p>
         <button class="btn perigo" type="button" id="b-eliminar-clase">Eliminar ${esc(c.nome)}</button></section>
     </div>`;
-    $('.axustes', main()).addEventListener('click', ev => {
-      const b = ev.target.closest('[data-accion]');
-      if (b && b.type !== 'checkbox') accionCopias(b.dataset.accion, b);
-    });
-    $('.axustes', main()).addEventListener('change', ev => {
-      if (ev.target.matches('input[type=checkbox][data-accion]')) accionCopias(ev.target.dataset.accion, ev.target);
-    });
+    escoitaAccions($('.axustes', main()));
     const form = $('#f-axustes');
     form.onsubmit = async ev => {
       ev.preventDefault();
@@ -954,14 +959,31 @@
     })[a.estado] || '';
   }
 
-  function seccionMovil() {
+  function escoitaAccions(el) {
+    el.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-accion]');
+      if (b && b.type !== 'checkbox') accionCopias(b.dataset.accion, b);
+    });
+    el.addEventListener('change', ev => {
+      if (ev.target.matches('input[type=checkbox][data-accion]')) accionCopias(ev.target.dataset.accion, ev.target);
+    });
+  }
+
+  // Volve pintar a pantalla onde estean os axustes do iPhone (benvida ou Axustes).
+  function repintaMovil() {
+    if (!E.clases.length) pintaBenvida();
+    else if (E.seccion === 'axustes') pintaAxustes();
+  }
+
+  function seccionMovil(benvida) {
     const s = E.sistema;
     const si = s.sincronizacion;
     const ok = t => `<span class="ok">✓ ${t}</span>`;
     const estadoSinc = !s.google || !s.clave ? '<span class="muted">—</span>'
       : si.conflito ? '<span class="malo">hai cambios en dous sitios</span>'
         : `<b>${dataHora(si.ultima)}</b>${si.pendente ? ' <span class="faint">(cambios aínda sen enviar)</span>' : ''}`;
-    return `<section class="box pad"><h2>Este iPhone</h2>
+    const pasos = benvida ? `<p style="margin:0 0 12px">Para traer as clases e as notas do Mac: <b>1.</b> conecta a conta de Google da familia e <b>2.</b> pon a clave de recuperación. Os datos chegan sós en poucos segundos.</p>` : '';
+    return `<section class="box pad"><h2>${benvida ? 'Traer os datos do Mac' : 'Este iPhone'}</h2>${pasos}
         <div class="pr"><span>Conta de Google</span>${s.google ? ok('conectada') : '<span class="muted">non conectada</span>'}</div>
         <div class="pr"><span>Clave de recuperación</span>${s.clave ? ok('posta') : '<span class="muted">falta</span>'}</div>
         <div class="pr"><span>Sincronizado co Mac</span>${estadoSinc}</div>
@@ -992,8 +1014,8 @@
     });
     if (r) {
       toast('Clave gardada');
-      window.CadernoPonte.sincroniza();
-      if (E.seccion === 'axustes') pintaAxustes();
+      repintaMovil();
+      await window.CadernoPonte.sincroniza();
     }
   }
 
@@ -1020,7 +1042,7 @@
         await P.desconectaGoogle();
       }
       await cargaSistema();
-      if (E.seccion === 'axustes') pintaAxustes();
+      repintaMovil();
     } catch (e) {
       toast(e.message, true);
       if (boton) boton.disabled = false;
