@@ -1,0 +1,30 @@
+/* Caderno no iPhone: axustes sobre app.css (pantalla pequena, app na pantalla de inicio, modo só consulta). */
+html{-webkit-text-size-adjust:100%}
+body{padding-bottom:env(safe-area-inset-bottom,0px)}
+.top{padding-top:max(12px,env(safe-area-inset-top,0px))}
+@media (max-width:700px){
+  #accions{width:100%}
+  #accions .btn{flex:1 1 auto}
+  .in{font-size:16px} /* menos de 16px fai que o iPhone amplíe a pantalla ao escribir */
+}
+.mais{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.mais summary{cursor:pointer;color:var(--muted);font-size:13px}
+.mais .radio{margin-top:10px}
+
+/* Modo só consulta: sen botóns nin campos para cambiar datos. */
+body.so-consulta #b-nova,
+body.so-consulta #b-nova-clase,
+body.so-consulta #b-primeira,
+body.so-consulta #b-primeira-proba,
+body.so-consulta #b-engadir,
+body.so-consulta #b-engadir2,
+body.so-consulta [data-nova],
+body.so-consulta [data-editar],
+body.so-consulta [data-eliminar],
+body.so-consulta [data-mover],
+body.so-consulta #f-axustes button[type=submit],
+body.so-consulta section:has(#b-eliminar-clase){display:none}
+body.so-consulta .in,
+body.so-consulta .th-proba,
+body.so-consulta #f-axustes input{pointer-events:none}
+body.so-consulta .in{background:transparent;border-color:transparent}

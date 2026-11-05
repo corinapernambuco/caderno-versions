@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="gl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderno</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Caderno">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1F4E79">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icona-180.png">
+<link rel="stylesheet" href="movil.css">
+<script src="config.js"></script>
+<script src="ponte.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="saltar" href="#main">Ir ao contido</a>
+<header class="top">
+  <div class="row brand-row">
+    <a class="brand" href="#/">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="var(--accent)"/><path d="M8 9h12M8 14h12M8 19h7" stroke="var(--accent-fg)" stroke-width="2" stroke-linecap="round"/></svg>
+      Caderno
+    </a>
+    <label class="sr-only" for="sel-clase">Clase</label>
+    <select class="btn sel" id="sel-clase" hidden></select>
+    <span class="pill" id="curso"></span>
+  </div>
+  <div class="row" id="accions" hidden>
+    <button class="btn" type="button" id="b-xls">Exportar a Excel</button>
+    <button class="btn" type="button" id="b-pdf">Informe PDF</button>
+    <button class="btn main" type="button" id="b-nova">+ Nova proba</button>
+  </div>
+</header>
+<div id="avisos" class="avisos" role="alert" hidden></div>
+
+<div class="wrap">
+  <nav aria-label="Seccións" id="nav">
+    <div id="nav-seccions"></div>
+    <div class="lbl">Clases</div>
+    <div id="nav-clases"></div>
+    <button type="button" class="engadir" id="b-nova-clase">+ Nova clase</button>
+  </nav>
+  <main id="main" tabindex="-1"><p class="cargando">Cargando…</p></main>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg" aria-labelledby="dlg-titulo"></dialog>
+</body>
+</html>

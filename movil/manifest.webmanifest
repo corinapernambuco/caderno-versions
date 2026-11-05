@@ -1,0 +1,14 @@
+{
+  "name": "Caderno",
+  "short_name": "Caderno",
+  "lang": "gl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F7F9",
+  "theme_color": "#1F4E79",
+  "icons": [
+    {"src": "icona-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
