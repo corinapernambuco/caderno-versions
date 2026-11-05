@@ -260,3 +260,22 @@ body.informe main{max-width:1100px;margin:0 auto}
   thead{display:table-header-group}
   .c.bad,.fin.bad,.fin,.fin.top{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* Aspecto de macOS (app do Mac con «Aspecto de macOS»): o contido chega ata arriba, barra lateral
+   translúcida (a xanela pon o material de macOS detrás), letra e tamaños do sistema, cor de acento do usuario. */
+:root.mac{--font:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif}
+@supports (color:AccentColor){:root.mac{--accent:AccentColor;--accent-fg:AccentColorText;--accent-soft:color-mix(in srgb,AccentColor 16%,var(--panel))}}
+.mac body{font-size:13px;-webkit-font-smoothing:antialiased;background:transparent;display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:auto auto auto 1fr;min-height:100vh}
+.mac .wrap{display:contents}
+.mac nav{grid-column:1;grid-row:1/-1;max-width:none;position:sticky;top:0;height:100vh;overflow:auto;padding:52px 10px 16px;background:transparent;border-right:1px solid var(--line)}
+.mac nav a,.mac nav .engadir{padding:6px 10px;border-radius:6px}
+.mac nav a.on{background:color-mix(in srgb,var(--fg) 10%,transparent);color:var(--fg);box-shadow:none}
+.mac header.top{grid-column:2;grid-row:1;min-height:52px;padding-top:8px;padding-bottom:8px}
+.mac header.top .brand{display:none}
+.mac #avisos{grid-column:2;grid-row:2}
+.mac .pechado{grid-column:2;grid-row:3}
+.mac main{grid-column:2;grid-row:4;background:var(--bg)}
+.mac .btn{height:30px;padding:0 12px;border-radius:7px;font-size:13px}
+.mac .btn.peq{height:26px}
+.mac h1{font-size:22px}
+@media print{.mac body{display:block}}

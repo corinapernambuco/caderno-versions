@@ -11,6 +11,9 @@
   const E = { clases: [], cursoActual: '', clase: null, seccion: null, vista: null, nav: 0, ultimaAv: '1', desbloqueadas: new Set() };
   let cola = Promise.resolve();
 
+  // Aspecto de macOS (só na app do Mac, se está activado): barra lateral translúcida, cor de acento do sistema.
+  if (new URLSearchParams(location.search).get('aspecto') === 'mac') document.documentElement.classList.add('mac');
+
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
   const main = () => $('#main');
@@ -1168,6 +1171,7 @@
         </div></section>
       <section class="box pad"><h2>Programa</h2>
         <div class="pr"><span>Versión</span><b>${esc(s.version)}</b></div>
+        <label class="radio"><input type="checkbox" data-accion="aspecto" ${s.aspecto_mac ? 'checked' : ''}><span>Aspecto de macOS <small class="muted">(barra lateral translúcida e cor de acento do sistema; aplícase ao abrir de novo o Caderno)</small></span></label>
         <div class="pr"><span>Actualizacións</span><span>${textoActualizacion(s)}</span></div>
         ${s.actualizacions ? '<div class="botoes" style="justify-content:flex-start"><button class="btn" type="button" data-accion="actualizar">Buscar actualizacións</button></div>' : ''}
       </section>`;
@@ -1191,6 +1195,10 @@
       if (accion === 'recuperar') return dialogoRecuperar();
       if (accion === 'clave') return dialogoClave(false);
       if (accion === 'conflito') return dialogoConflito();
+      if (accion === 'aspecto') {
+        E.sistema = await api('POST', '/api/aspecto', { mac: boton.checked });
+        return toast('Pecha e abre de novo o Caderno para ver o cambio');
+      }
       if (esMovil()) return accionMovil(accion, boton);
       boton.disabled = true;
       if (accion === 'copia') {
@@ -1316,6 +1324,10 @@
 
   // --- inicio --------------------------------------------------------------------------
   function inicia() {
+    // Na xanela de Mac sen barra de título, a xanela arrástrase desde o espazo baleiro da barra superior.
+    if (document.documentElement.classList.contains('mac')) {
+      $$('header.top, header.top .row').forEach(el => el.classList.add('pywebview-drag-region'));
+    }
     $('#sel-clase').onchange = ev => {
       const id = Number(ev.target.value);
       const arg = ['notas', 'estatisticas'].includes(E.seccion) ? E.ultimaAv : null;
