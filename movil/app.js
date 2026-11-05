@@ -349,8 +349,10 @@
     if (!v.probas.length) {
       main().innerHTML = cab + baleiro(`Aínda non hai probas na ${NOMES_AV[av]}`,
         'Crea as probas (exames, mapas, ditados, traballos…) co seu peso; os pesos deben sumar 100 %.',
-        '<button class="btn main" type="button" id="b-primeira-proba">+ Nova proba</button>');
+        '<button class="btn main" type="button" id="b-primeira-proba">+ Nova proba</button>' +
+        (E.clases.length > 1 ? ' <button class="btn" type="button" id="b-importar2">Importar doutra clase…</button>' : ''));
       $('#b-primeira-proba').onclick = () => dialogoProba(null, v.avaliacion);
+      if ($('#b-importar2')) $('#b-importar2').onclick = dialogoImportar;
       return;
     }
     main().innerHTML = cab + `<div class="cards" id="cards">${tarxetasAvaliacion(v)}</div>
@@ -613,7 +615,8 @@
   async function pintaProbas(t) {
     const d = await api('GET', `/api/clases/${E.clase.id}/probas`);
     if (t !== E.nav) return;
-    let h = cabeceira('Probas', 'En cada avaliación os pesos deben sumar 100 %. Preme o nome dunha proba no cadro de notas para editala.');
+    let h = cabeceira('Probas', 'En cada avaliación os pesos deben sumar 100 %. Preme o nome dunha proba no cadro de notas para editala.',
+      E.clases.length > 1 ? '<button class="btn" type="button" id="b-importar">Importar doutra clase…</button>' : '');
     [1, 2, 3].forEach(av => {
       const ps = d.probas.filter(p => p.avaliacion === av);
       const suma = ps.reduce((s, p) => s + p.peso, 0);
@@ -641,6 +644,7 @@
       h += '</tbody></table></div></section>';
     });
     main().innerHTML = `<div class="pila" id="probas">${h}</div>`;
+    if ($('#b-importar')) $('#b-importar').onclick = dialogoImportar;
     $('#probas').onclick = async ev => {
       const b = ev.target.closest('button');
       if (!b) return;
@@ -653,6 +657,79 @@
         try { await api('POST', `/api/probas/${p.id}/mover`, { direccion: Number(b.dataset.dir) }); navega(); } catch (e) { toast(e.message, true); }
       }
     };
+  }
+
+  // Trae as probas (nome, tipo, peso) doutra clase, tamén de cursos anteriores: os esquemas repítense.
+  async function dialogoImportar() {
+    let actuais;
+    try { actuais = (await api('GET', `/api/clases/${E.clase.id}/probas`)).probas; } catch (e) { return toast(e.message, true); }
+    const outras = cursos().map(g => ({ ...g, clases: g.clases.filter(x => x.id !== E.clase.id) })).filter(g => g.clases.length);
+    if (!outras.length) return toast('Non hai outras clases das que importar.', true);
+    const orixe = { probas: null };
+    const resumoAv = (ps) => ps.length ? ps.map(p => `${esc(p.nome)} <span class="faint">${num(p.peso)} %</span>`).join(' · ') : '<span class="faint">sen probas</span>';
+    const r = await dialogo({
+      titulo: 'Importar probas doutra clase',
+      boton: 'Importar',
+      html: `<label class="campo"><span>Clase de orixe</span><select name="de"><option value="">Escolle unha clase…</option>
+          ${outras.map(g => `<optgroup label="Curso ${esc(g.etiqueta)}">${g.clases.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.materia)}</option>`).join('')}</optgroup>`).join('')}</select>
+          <small>Cópianse o nome, o tipo e o peso de cada proba; nin notas nin datas.</small></label>
+        <fieldset class="campo" id="imp-avs" hidden><legend>Que avaliacións</legend><div id="imp-lista"></div></fieldset>
+        <fieldset class="campo" id="imp-modo" hidden><legend>As probas que xa ten ${esc(E.clase.nome)}</legend>
+          <label class="radio"><input type="radio" name="modo" value="engadir" checked><span>Conservalas e engadir as importadas ao final</span></label>
+          <label class="radio"><input type="radio" name="modo" value="substituir"><span>Substituílas polas importadas</span></label>
+          <p class="muted" id="imp-aviso" style="margin:4px 0 0;font-size:13px"></p>
+          <label class="radio" id="imp-confirma" hidden><input type="checkbox" name="confirma"><span id="imp-confirma-txt"></span></label>
+        </fieldset>`,
+      aoAbrir(form) {
+        const avsMarcadas = () => $$('input[name=av]:checked', form).map(i => Number(i.value));
+        const actualiza = () => {
+          if (!orixe.probas) return;
+          const avs = avsMarcadas();
+          const subst = form.modo.value === 'substituir';
+          const afectadas = actuais.filter(p => avs.includes(p.avaliacion));
+          const notas = afectadas.reduce((s, p) => s + p.postas, 0);
+          $('#imp-modo', form).hidden = !afectadas.length;
+          let aviso = '';
+          if (subst) {
+            aviso = afectadas.length ? `Bórranse ${plural(afectadas.length, 'proba', 'probas')}${notas ? ` e ${plural(notas, 'nota posta', 'notas postas')} nelas` : ''}. Non se pode desfacer.` : '';
+          } else {
+            const sumas = avs.map(a => {
+              const total = [...actuais, ...orixe.probas].filter(p => p.avaliacion === a).reduce((s, p) => s + p.peso, 0);
+              return sumaPesosOk(total) ? '' : `${NOMES_AV[a]}: os pesos sumarán ${num(total)} %`;
+            }).filter(Boolean);
+            aviso = sumas.length ? '⚠ ' + sumas.join(' · ') + '. Despois podes axustalos ou eliminar as que sobren.' : '';
+          }
+          $('#imp-aviso', form).textContent = aviso;
+          $('#imp-aviso', form).className = subst && notas ? 'malo' : 'muted';
+          $('#imp-confirma', form).hidden = !(subst && notas);
+          $('#imp-confirma-txt', form).textContent = `Entendo que se borran ${plural(notas, 'nota', 'notas')}`;
+        };
+        form.de.addEventListener('change', async () => {
+          orixe.probas = null;
+          $('#imp-avs', form).hidden = $('#imp-modo', form).hidden = true;
+          if (!form.de.value) return;
+          try { orixe.probas = (await api('GET', `/api/clases/${form.de.value}/probas`)).probas; } catch (e) { return toast(e.message, true); }
+          $('#imp-lista', form).innerHTML = [1, 2, 3].map(a => {
+            const ps = orixe.probas.filter(p => p.avaliacion === a);
+            return `<label class="radio"><input type="checkbox" name="av" value="${a}" ${ps.length ? 'checked' : 'disabled'}><span><b>${NOMES_AV[a]}</b><br><small>${resumoAv(ps)}</small></span></label>`;
+          }).join('');
+          $('#imp-avs', form).hidden = false;
+          actualiza();
+        });
+        form.addEventListener('change', ev => { if (ev.target.name !== 'de') actualiza(); });
+      },
+      async aoEnviar(form) {
+        if (!form.de.value || !orixe.probas) throw new Error('Escolle a clase de orixe.');
+        const avs = $$('input[name=av]:checked', form).map(i => Number(i.value));
+        if (!avs.length) throw new Error('Escolle polo menos unha avaliación con probas.');
+        const substituir = !$('#imp-modo', form).hidden && form.modo.value === 'substituir';
+        if (substituir && !$('#imp-confirma', form).hidden && !form.confirma.checked) throw new Error('Marca a confirmación: bórranse notas.');
+        return api('POST', `/api/clases/${E.clase.id}/probas/importar`, { de: Number(form.de.value), avaliacions: avs, substituir });
+      },
+    });
+    if (!r) return;
+    toast(`${plural(r.importadas, 'proba importada', 'probas importadas')}` + (r.saltadas ? ` (${r.saltadas} de deberes non, porque xa había)` : ''));
+    navega();
   }
 
   async function eliminaProba(p) {

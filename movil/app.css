@@ -259,7 +259,7 @@ nav .anteriores summary{padding:8px 12px;font-size:13px;color:var(--muted);curso
 /* Só consulta: o iPhone en modo consulta (so-consulta) e os cursos xa rematados (curso-pechado). */
 body.so-consulta #b-nova-clase,
 body.so-consulta section:has(#b-eliminar-curso),
-:is(body.so-consulta,body.curso-pechado) :is(#b-nova,#b-primeira-proba,#b-engadir,#b-engadir2,[data-nova],[data-editar],[data-eliminar],[data-mover],#f-axustes button[type=submit],#b-pedir,#b-pedir2,[data-deberes],[data-todos]),
+:is(body.so-consulta,body.curso-pechado) :is(#b-nova,#b-primeira-proba,#b-engadir,#b-engadir2,[data-nova],[data-editar],[data-eliminar],[data-mover],#f-axustes button[type=submit],#b-pedir,#b-pedir2,[data-deberes],[data-todos],#b-importar,#b-importar2),
 :is(body.so-consulta,body.curso-pechado) section:has(#b-eliminar-clase){display:none}
 body.so-consulta #b-primeira{display:none}
 :is(body.so-consulta,body.curso-pechado) :is(.in,.th-proba,.dm,#f-axustes input){pointer-events:none}
