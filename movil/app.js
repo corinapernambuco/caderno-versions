@@ -2,9 +2,10 @@
 'use strict';
 (function () {
   const NOMES_AV = { 1: '1ª Avaliación', 2: '2ª Avaliación', 3: '3ª Avaliación', final: 'Final' };
-  const SECCIONS = [['notas', 'Notas'], ['alumnado', 'Alumnado'], ['probas', 'Probas'],
+  const SECCIONS = [['notas', 'Notas'], ['alumnado', 'Alumnado'], ['probas', 'Probas'], ['deberes', 'Deberes'],
     ['estatisticas', 'Estatísticas'], ['axustes', 'Axustes']];
   const TIPOS = { nota: 'Nota', acertos: 'Acertos', faltas: 'Faltas' };
+  function tipoProba(p) { return p.deberes ? 'Deberes' : TIPOS[p.tipo]; }
   // Reparto: Insuficiente en estado crítico; o resto, rampla ordinal dun só ton.
   const CORES_REPARTO = ['--crit', '--o1', '--o2', '--o3', '--o4'];
 
@@ -46,7 +47,7 @@
   function sumaPesosOk(s) { return Math.abs(s - 100) < 1e-9; }
 
   async function api(metodo, url, corpo) {
-    if (metodo !== 'GET' && bloqueada() && /^\/api\/(clases\/\d+|alumnos|probas|cualificacions|comportamentos)/.test(url)) {
+    if (metodo !== 'GET' && bloqueada() && /^\/api\/(clases\/\d+|alumnos|probas|cualificacions|comportamentos|deberes|entregas)/.test(url)) {
       throw new Error(`O curso ${E.clase.curso} está pechado: preme «Permitir cambios» para modificalo.`);
     }
     // No iPhone non hai servidor: o mesmo código Python corre no navegador (movil/ponte.js).
@@ -84,6 +85,11 @@
   }
   function avValida(a) { return ['1', '2', '3', 'final'].includes(a) ? a : null; }
   function avNumerica() { return ['1', '2', '3'].includes(E.ultimaAv) ? Number(E.ultimaAv) : 1; }
+  // Avaliación que se leva ao cambiar de sección ou de clase (deberes non ten «Final»).
+  function argSeccion(k) {
+    if (['notas', 'estatisticas'].includes(k)) return E.ultimaAv;
+    return k === 'deberes' ? String(avNumerica()) : null;
+  }
 
   // --- cursos: cada curso agrupa todas as súas clases; os xa rematados quedan só para consulta ---
   function anoCurso(t) { const m = /^\s*(\d{4})/.exec(t || ''); return m ? Number(m[1]) : null; }
@@ -136,6 +142,7 @@
         case 'notas': return await pintaNotas(r.arg, t);
         case 'alumnado': return await pintaAlumnado(t);
         case 'probas': return await pintaProbas(t);
+        case 'deberes': return await pintaDeberes(r.arg, t);
         case 'estatisticas': return await pintaEstatisticas(r.arg, t);
         case 'axustes':
           await cargaSistema();
@@ -178,14 +185,21 @@
     barra.innerHTML = c ? `<p>Curso ${esc(c.curso)} rematado: só consulta. <button class="btn peq" type="button" data-desbloquear>Permitir cambios</button></p>` : '';
     const sec = E.seccion === 'informe' ? 'notas' : E.seccion;
     $('#nav-seccions').innerHTML = c ? SECCIONS.map(([k, l]) =>
-      `<a href="${href(k, ['notas', 'estatisticas'].includes(k) ? E.ultimaAv : null)}" class="${k === sec ? 'on' : ''}" ${k === sec ? 'aria-current="page"' : ''}>${l}</a>`).join('') : '';
-    const ligazon = x => `<a href="${href(sec || 'notas', ['notas', 'estatisticas'].includes(sec) ? E.ultimaAv : null, x.id)}" class="${c && x.id === c.id ? 'on' : ''}">${esc(x.nome)}</a>`;
+      `<a href="${href(k, argSeccion(k))}" class="${k === sec ? 'on' : ''}" ${k === sec ? 'aria-current="page"' : ''}>${l}</a>`).join('') : '';
+    const ligazon = x => `<a href="${href(sec || 'notas', argSeccion(sec || 'notas'), x.id)}" class="materia ${c && x.id === c.id ? 'on' : ''}" ${c && x.id === c.id ? 'aria-current="true"' : ''}>${esc(x.materia)}</a>`;
+    // Cada grupo (4º A…) é só un título; debaixo, as súas materias, que son as clases.
+    const arbore = cls => {
+      const grupos = new Map();
+      cls.forEach(x => { if (!grupos.has(x.nome)) grupos.set(x.nome, []); grupos.get(x.nome).push(x); });
+      return [...grupos].map(([nome, xs]) => `<div class="grupo" role="group" aria-label="${esc(nome)}"><div class="grupo-nome">${esc(nome)}</div>
+        ${xs.sort((a, b) => a.materia.localeCompare(b.materia, 'gl')).map(ligazon).join('')}</div>`).join('');
+    };
     const activos = gs.filter(g => !g.pechado);
     const anteriores = gs.filter(g => g.pechado);
     const titulo = g => (activos.length > 1 || !activos.length ? `<div class="lbl-curso">${esc(g.etiqueta)}</div>` : '');
-    $('#nav-clases').innerHTML = activos.map(g => titulo(g) + g.clases.map(ligazon).join('')).join('')
+    $('#nav-clases').innerHTML = activos.map(g => titulo(g) + arbore(g.clases)).join('')
       + (anteriores.length ? `<details class="anteriores" ${c && pechada(c) ? 'open' : ''}><summary>Cursos anteriores</summary>
-        ${anteriores.map(g => `<div class="lbl-curso">${esc(g.etiqueta)}</div>${g.clases.map(ligazon).join('')}`).join('')}</details>` : '');
+        ${anteriores.map(g => `<div class="lbl-curso">${esc(g.etiqueta)}</div>${arbore(g.clases)}`).join('')}</details>` : '');
   }
 
   async function desbloquea() {
@@ -199,8 +213,8 @@
     return `<div class="head"><div><h1>${titulo}</h1><p class="sub" id="sub">${sub}</p></div>${dereita || ''}</div>`;
   }
 
-  function lapelas(seccion, actual) {
-    return '<div class="tabs" role="tablist" aria-label="Avaliación">' + ['1', '2', '3', 'final'].map(k =>
+  function lapelas(seccion, actual, claves = ['1', '2', '3', 'final']) {
+    return '<div class="tabs" role="tablist" aria-label="Avaliación">' + claves.map(k =>
       `<a role="tab" href="${href(seccion, k)}" aria-selected="${k === actual}">${NOMES_AV[k]}</a>`).join('') + '</div>';
   }
 
@@ -250,7 +264,7 @@
     if (av === 'final') pintaFinal(v); else pintaAvaliacion(v);
   }
 
-  function metaProba(p) { return `${TIPOS[p.tipo].toLowerCase()} · ${num(p.peso)} %`; }
+  function metaProba(p) { return `${tipoProba(p).toLowerCase()} · ${num(p.peso)} %`; }
   function claseCela(cel) { return cel.estado === 'baixo' ? 'bad' : cel.estado === 'pendente' ? 'wait' : ''; }
   function subCela(p, cel) { return cel.valor != null && p.tipo !== 'nota' ? '→ ' + num(cel.nota, 1) : ''; }
 
@@ -315,7 +329,9 @@
         <td><input class="in c-in" data-fila="${i}" data-col="0" value="${valorInput(f.comportamento)}" data-orixinal="${chave(f.comportamento)}" inputmode="decimal" autocomplete="off" aria-label="Comportamento · ${esc(f.nome)}"><span class="lt">${f.letra}</span></td>`;
       f.celas.forEach((cel, j) => {
         const p = v.probas[j];
-        h += `<td><span class="cel ${cel.estado === 'baixo' ? 'bad' : ''}"><input class="in ${claseCela(cel)}" data-proba="${p.id}" data-fila="${i}" data-col="${j + 1}" value="${valorInput(cel.valor)}" data-orixinal="${chave(cel.valor)}" inputmode="decimal" autocomplete="off" aria-label="${esc(p.nome)} · ${esc(f.nome)}"><small>${subCela(p, cel)}</small></span></td>`;
+        // A proba de deberes calcúlase soa: só se le (cámbiase na sección Deberes).
+        const auto = p.deberes ? ' readonly tabindex="-1" title="Calculada cos deberes: cámbiase na sección Deberes"' : '';
+        h += `<td><span class="cel ${cel.estado === 'baixo' ? 'bad' : ''}"><input class="in ${claseCela(cel)}${p.deberes ? ' auto' : ''}" data-proba="${p.id}" data-fila="${i}" data-col="${j + 1}" value="${valorInput(cel.valor)}" data-orixinal="${chave(cel.valor)}" inputmode="decimal" autocomplete="off" aria-label="${esc(p.nome)} · ${esc(f.nome)}"${auto}><small>${subCela(p, cel)}</small></span></td>`;
       });
       h += `<td class="nota">${num(f.nota, 2)}</td><td class="fin-cel">${chipFinal(f.redondeada)}</td></tr>`;
     });
@@ -403,7 +419,7 @@
     input.dataset.orixinal = chave(valor);
     // En fila: as respostas aplícanse na mesma orde en que se gardaron.
     cola = cola.then(() => api('PUT', ...pet)).then(nova => {
-      if (E.vista && E.vista.clase.id === nova.clase.id && E.vista.avaliacion === nova.avaliacion) actualizaAvaliacion(nova);
+      if (E.seccion === 'notas' && E.vista && E.vista.clase.id === nova.clase.id && E.vista.avaliacion === nova.avaliacion) actualizaAvaliacion(nova);
     }).catch(e => {
       input.dataset.orixinal = anterior;
       input.classList.add('erro');
@@ -588,6 +604,7 @@
 
   // --- probas ------------------------------------------------------------------------
   function detalleProba(p) {
+    if (p.deberes) return 'feitos ÷ marcados × 10 (automática)';
     if (p.tipo === 'acertos') return `sobre ${num(p.parametro)} preguntas`;
     if (p.tipo === 'faltas') return `−${num(p.parametro)} por falta`;
     return 'sobre 10';
@@ -602,8 +619,9 @@
       const suma = ps.reduce((s, p) => s + p.peso, 0);
       const etq = !ps.length ? '' : sumaPesosOk(suma) ? '<span class="etq ok">✓ pesos: 100 %</span>'
         : `<span class="etq malo">⚠ pesos: ${num(suma)} %</span>`;
+      const traer = ps.some(p => p.deberes) ? '' : `<button class="btn peq" type="button" data-deberes="${av}" title="Unha proba coa nota dos deberes desta avaliación">Traer deberes</button>`;
       h += `<section class="box"><div class="cab-box"><div class="row"><h2>${NOMES_AV[av]}</h2>${etq}</div>
-        <button class="btn peq" type="button" data-nova="${av}">+ Nova proba</button></div>`;
+        <div class="row">${traer}<button class="btn peq" type="button" data-nova="${av}">+ Nova proba</button></div></div>`;
       if (!ps.length) {
         h += '<p class="baleiro" style="padding:16px">Sen probas.</p></section>';
         return;
@@ -614,7 +632,7 @@
         h += `<tr><td class="l" style="padding-left:10px;white-space:nowrap">
             <button class="icono" type="button" data-mover="${p.id}" data-dir="-1" aria-label="Subir ${esc(p.nome)}" ${i === 0 ? 'disabled' : ''}>↑</button>
             <button class="icono" type="button" data-mover="${p.id}" data-dir="1" aria-label="Baixar ${esc(p.nome)}" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button></td>
-          <td class="l name">${esc(p.nome)}</td><td class="l">${TIPOS[p.tipo]}</td><td>${num(p.peso)} %</td>
+          <td class="l name">${esc(p.nome)}</td><td class="l">${tipoProba(p)}</td><td>${num(p.peso)} %</td>
           <td class="l muted">${detalleProba(p)}</td><td class="muted">${dataCurta(p.data)}</td>
           <td class="muted">${p.postas} de ${d.alumnos}</td>
           <td><div class="botons-fila"><button class="btn peq" type="button" data-editar="${p.id}">Editar</button>
@@ -628,6 +646,7 @@
       if (!b) return;
       const p = d.probas.find(x => x.id === Number(b.dataset.editar || b.dataset.eliminar || b.dataset.mover));
       if (b.dataset.nova) dialogoProba(null, Number(b.dataset.nova));
+      else if (b.dataset.deberes) dialogoProbaDeberes(Number(b.dataset.deberes));
       else if (b.dataset.editar) dialogoProba(p);
       else if (b.dataset.eliminar) eliminaProba(p);
       else if (b.dataset.mover) {
@@ -653,6 +672,7 @@
     try { lista = (await api('GET', `/api/clases/${E.clase.id}/probas`)).probas; } catch (e) { return toast(e.message, true); }
     const ed = p ? lista.find(x => x.id === p.id) || p : null;
     const d = ed || { nome: '', avaliacion: avInicial || avNumerica(), tipo: 'nota', peso: null, parametro: null, data: '' };
+    const deb = !!(ed && ed.deberes);
     const radio = (k, texto) => `<label class="radio"><input type="radio" name="tipo" value="${k}" ${d.tipo === k ? 'checked' : ''}><span>${texto}</span></label>`;
     return dialogo({
       titulo: ed ? 'Editar proba' : 'Nova proba',
@@ -660,13 +680,15 @@
       extra: ed ? '<button type="button" class="btn perigo" data-eliminar style="margin-right:auto">Eliminar</button>' : '',
       html: `<label class="campo"><span>Nome</span><input name="nome" maxlength="40" value="${esc(d.nome)}" placeholder="Ex. 1, Mapa, Ditado, PBL…" autocomplete="off"></label>
         <div class="fila3">
-          <label class="campo"><span>Avaliación</span><select name="avaliacion">${[1, 2, 3].map(a =>
+          <label class="campo"><span>Avaliación</span><select name="avaliacion" ${deb ? 'disabled' : ''}>${[1, 2, 3].map(a =>
             `<option value="${a}" ${a === d.avaliacion ? 'selected' : ''}>${NOMES_AV[a]}</option>`).join('')}</select></label>
           <label class="campo"><span>Peso (%)</span><input name="peso" inputmode="decimal" autocomplete="off" value="${d.peso == null ? '' : num(d.peso)}"></label>
           <label class="campo"><span>Data <small>(opcional)</small></span><input type="date" name="data" value="${esc(d.data || '')}"></label>
         </div>
         <small class="faint" id="info-peso"></small>
-        <fieldset class="campo"><legend>Tipo de proba</legend>
+        ${deb ? `<p class="muted" style="margin:0">Proba de deberes: a nota de cada alumno é feitos ÷ marcados × 10 e calcúlase soa coas marcas da sección Deberes.</p>
+          <input type="hidden" name="tipo" value="nota">` : ''}
+        <fieldset class="campo" ${deb ? 'hidden' : ''}><legend>Tipo de proba</legend>
           ${radio('nota', 'Nota <span class="faint">— sobre 10</span>')}
           ${radio('acertos', 'Acertos <span class="faint">— acertos ÷ preguntas totais × 10</span>')}
           ${radio('faltas', 'Faltas <span class="faint">— 10 − faltas × penalización (mínimo 0)</span>')}
@@ -703,6 +725,329 @@
         toast(ed ? 'Proba gardada' : 'Proba creada');
         if (!ed && E.seccion === 'notas' && E.ultimaAv !== String(corpo.avaliacion)) location.hash = href('notas', String(corpo.avaliacion));
         else navega();
+      },
+    });
+  }
+
+  // --- deberes -----------------------------------------------------------------------
+  // Cada día que se piden deberes é unha columna; en cada cela, un toque cambia: sen marcar → feitos → non feitos.
+  const DIAS = ['dom', 'lun', 'mar', 'mér', 'xov', 'ven', 'sáb'];
+  function hoxeIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function diaMes(iso) { const [, m, d] = iso.split('-'); return `${d}/${m}`; }
+  function diaSemana(iso) { const [a, m, d] = iso.split('-').map(Number); return DIAS[new Date(a, m - 1, d).getDay()]; }
+  function porcento(x) { return x == null ? '—' : Math.round(x) + ' %'; }
+
+  async function pintaDeberes(arg, t) {
+    if (!['1', '2', '3'].includes(arg)) return location.replace(href('deberes', String(avNumerica())));
+    E.ultimaAv = arg;
+    pintaCabeceira();
+    const v = await api('GET', `/api/clases/${E.clase.id}/deberes/${arg}`);
+    if (t !== E.nav) return;
+    E.vista = v;
+    pintaVistaDeberes(v);
+  }
+
+  function subDeberes(v) {
+    const ult = v.deberes.length ? ` · últimos o ${dataCurta(v.deberes[v.deberes.length - 1].data)}` : '';
+    return `${plural(v.filas.length, 'alumno', 'alumnos')} · ${v.deberes.length === 1 ? '1 vez' : v.deberes.length + ' veces'} con deberes${ult}`;
+  }
+
+  function tarxetasDeberes(v) {
+    const r = v.resumo;
+    return tarxetas([
+      ['Deberes pedidos', r.deberes, r.deberes ? `último: ${dataCurta(v.deberes[r.deberes - 1].data)}` : 'aínda ningún', ''],
+      ['Feitos', porcento(r.porcentaxe), 'de todos os marcados', 'acc'],
+      ['Sempre feitos', r.todos, 'alumnos sen ningún «non»', ''],
+      ['Precisan atención', r.atencion, 'menos do 50 % ou 2 seguidos sen facer', 'bad'],
+    ]);
+  }
+
+  function celaDeber(m, i, j, f, d) {
+    const estado = m === true ? 'si' : m === false ? 'non' : '';
+    const texto = m === true ? 'feitos' : m === false ? 'non feitos' : 'sen marcar';
+    return `<button type="button" class="dm ${estado}" data-f="${i}" data-d="${j}" aria-label="${esc(f.nome)}, ${diaMes(d.data)}: ${texto}">${m === true ? '✓' : m === false ? '✗' : ''}</button>`;
+  }
+
+  function barraPct(x) {
+    const w = x == null ? 0 : x;
+    return `<span class="mini" aria-hidden="true"><i style="width:${w}%;background:var(${x != null && x < 50 ? '--crit' : '--s3'})"></i></span>`;
+  }
+
+  function resumoFila(f) {
+    const pct = f.marcados ? f.feitos / f.marcados * 100 : null;
+    return { feitos: f.marcados ? `${f.feitos}/${f.marcados}` : '—', pct, nota: num(f.nota, 1) };
+  }
+
+  function taboaDeberes(v) {
+    let h = `<thead><tr><th class="l sticky1" style="padding-left:14px">Nº</th><th class="l sticky2">Alumno/a</th>`;
+    v.deberes.forEach((d, j) => {
+      h += `<th class="th-deber"><button type="button" class="th-proba" data-editar-deber="${j}" title="${esc(d.descricion || 'Editar ou cambiar a data')}">${diaMes(d.data)}</button>
+        <span class="m">${diaSemana(d.data)}${d.descricion ? ' · ' + esc(d.descricion.length > 14 ? d.descricion.slice(0, 13) + '…' : d.descricion) : ''}</span>
+        <button type="button" class="todos" data-todos="${j}" ${d.pendentes ? '' : 'hidden'} title="Marcar como feitos os que aínda non teñen marca">✓ resto</button></th>`;
+    });
+    h += '<th class="n">Feitos</th><th class="n">%</th><th class="n">Nota</th></tr></thead><tbody>';
+    v.filas.forEach((f, i) => {
+      const r = resumoFila(f);
+      h += `<tr><td class="num l sticky1">${f.num}</td><td class="name l sticky2">${esc(f.nome)}${f.racha >= 2 ? ` <span class="racha" title="${f.racha} deberes seguidos sen facer">${f.racha}✗</span>` : ''}</td>`;
+      f.marcas.forEach((m, j) => { h += `<td class="cm">${celaDeber(m, i, j, f, v.deberes[j])}</td>`; });
+      h += `<td class="rf">${r.feitos}</td><td class="rp">${barraPct(r.pct)}<span>${porcento(r.pct)}</span></td><td class="rn ${f.redondeada != null && f.redondeada < 5 ? 'malo' : ''}">${r.nota}</td></tr>`;
+    });
+    h += `</tbody><tfoot><tr><td class="sticky1"></td><td class="l sticky2 muted">Feitos</td>${v.deberes.map(d =>
+      `<td class="pc">${porcento(d.porcentaxe)}</td>`).join('')}<td colspan="3"></td></tr></tfoot>`;
+    return h;
+  }
+
+  function evolucionDeberes(v) {
+    if (!v.deberes.length) return '<p class="muted" style="margin:0">Aínda sen datos.</p>';
+    const cols = v.deberes.map(d => {
+      const x = d.porcentaxe;
+      return `<div class="col" title="${dataCurta(d.data)}: ${porcento(x)} feitos">${x == null ? '' : `<span>${Math.round(x)}</span>`}
+        <i style="height:${x || 0}%;background:var(${x != null && x < 50 ? '--crit' : '--s3'})"></i></div>`;
+    }).join('');
+    const eixo = v.deberes.map(d => `<span>${diaMes(d.data)}</span>`).join('');
+    const n = `repeat(${v.deberes.length},minmax(0,1fr))`;
+    return `<div class="hist evol" style="grid-template-columns:${n}" role="img" aria-label="Porcentaxe da clase que fixo cada deber">${cols}</div>
+      <div class="hist-x" style="grid-template-columns:${n}">${eixo}</div>`;
+  }
+
+  function repartoDeberes(r) {
+    const total = r.tramos.reduce((s, x) => s + x.n, 0);
+    const cores = ['--s3', '--o3', '--o1', '--crit'];
+    return '<div class="bars">' + r.tramos.map((c, i) =>
+      `<div class="bar" title="${c.nome}: ${c.n} (${pct(c.n, total)})"><span>${c.nome}</span>` +
+      `<span class="track"><i style="width:${total ? c.n / total * 100 : 0}%;background:var(${cores[i]})"></i></span><b>${c.n}</b></div>`).join('') + '</div>';
+  }
+
+  function atencionDeberes(v) {
+    const l = v.filas.filter(f => f.marcados && (f.nota < 5 || f.racha >= 2)).sort((a, b) => a.nota - b.nota || b.racha - a.racha);
+    if (!l.length) return '<p class="muted" style="margin:0">Ninguén: todos fan polo menos a metade e ningún leva dous seguidos sen facer.</p>';
+    return l.map(f => `<div class="pr"><span>${esc(f.nome)}<small class="faint" style="display:block">${f.feitos} de ${f.marcados}${f.racha >= 2 ? ` · ${f.racha} seguidos sen facer` : ''}</small></span>
+      <b class="${f.nota < 5 ? 'malo' : ''}">${porcento(f.feitos / f.marcados * 100)}</b></div>`).join('');
+  }
+
+  function notaDeberes(v) {
+    const av = NOMES_AV[v.avaliacion];
+    if (v.proba) {
+      return `<section class="box"><h2>Na nota da avaliación</h2>
+        <p class="muted" style="margin:0 0 10px;font-size:13px">A proba <b>${esc(v.proba.nome)}</b> conta un <b>${num(v.proba.peso)} %</b> na ${av}. A nota de cada alumno é feitos ÷ marcados × 10 e actualízase soa; os días sen marcar non contan.</p>
+        <a class="btn peq" href="${href('notas', String(v.avaliacion))}">Ver no cadro de notas</a></section>`;
+    }
+    return `<section class="box"><h2>Levar ás notas</h2>
+      <p class="muted" style="margin:0 0 10px;font-size:13px">Crea na ${av} unha proba «Deberes» co peso que queiras. A nota de cada alumno será feitos ÷ marcados × 10 e irá cambiando soa cando marques novos deberes.</p>
+      <button class="btn peq main" type="button" data-deberes="${v.avaliacion}">Levar os deberes ás notas…</button></section>`;
+  }
+
+  function asideDeberes(v) {
+    return `${notaDeberes(v)}
+      <section class="box"><h2>Precisan atención</h2>${atencionDeberes(v)}</section>
+      <section class="box"><h2>Evolución</h2><p class="sub" style="margin:-8px 0 4px;font-size:12px">Porcentaxe da clase que fixo cada deber</p>${evolucionDeberes(v)}</section>
+      <section class="box"><h2>Reparto do alumnado</h2><p class="sub" style="margin:-8px 0 12px;font-size:12px">Segundo a porcentaxe de deberes feitos</p>${repartoDeberes(v.resumo)}</section>`;
+  }
+
+  function pintaVistaDeberes(v) {
+    const av = String(v.avaliacion);
+    const boton = '<button class="btn main" type="button" id="b-pedir">+ Deberes</button>';
+    const cab = cabeceira('Deberes · ' + NOMES_AV[av], subDeberes(v), `<div class="row">${lapelas('deberes', av, ['1', '2', '3'])}${v.filas.length ? boton : ''}</div>`);
+    if (!v.filas.length) {
+      main().innerHTML = cab + baleiro('Aínda non hai alumnado nesta clase', 'Engade a lista de alumnos para levar a conta dos deberes.',
+        `<a class="btn main" href="${href('alumnado')}">Engadir alumnado</a>`);
+      return;
+    }
+    if (!v.deberes.length) {
+      main().innerHTML = cab + baleiro(`Aínda non se pediron deberes na ${NOMES_AV[av]}`,
+        'Cada vez que mandes deberes, prema «+ Deberes»: aparece unha columna co día e marcas quen os fixo cun toque. Podes poñer unha data pasada para rexistrar días anteriores.',
+        '<button class="btn main" type="button" id="b-pedir2">+ Deberes</button>');
+      $('#b-pedir').onclick = $('#b-pedir2').onclick = () => dialogoDeberes(null, v.avaliacion);
+      return;
+    }
+    main().innerHTML = cab + `<div class="cards" id="cards">${tarxetasDeberes(v)}</div>
+      <div class="grid2">
+        <section class="box tablebox" aria-label="Deberes">
+          <div class="scroll" id="scroll-deberes"><table id="taboa-deberes" class="deberes">${taboaDeberes(v)}</table></div>
+          <div class="legend"><span><i class="sw dm-sw si"></i>Feitos</span><span><i class="sw dm-sw non"></i>Non feitos</span>
+            <span><i class="sw dm-sw"></i>Sen marcar (non conta: faltou, xustificado…)</span>
+            <span class="faint">Toque: feitos → non → sen marcar · Teclas: S feitos, N non, Supr borrar, frechas para moverse</span></div>
+        </section>
+        <aside id="aside">${asideDeberes(v)}</aside>
+      </div>`;
+    // Vense os últimos deberes e, se collen, os totais (no iPhone, a última columna xusto despois do nome).
+    const sc = $('#scroll-deberes');
+    const ult = $$('#taboa-deberes th.th-deber').pop();
+    const fixas = $$('#taboa-deberes thead th.sticky1, #taboa-deberes thead th.sticky2').reduce((w, th) => w + th.offsetWidth, 0);
+    sc.scrollLeft = Math.min(sc.scrollWidth - sc.clientWidth, ult.offsetLeft - fixas);
+    $('#b-pedir').onclick = () => dialogoDeberes(null, v.avaliacion);
+    const taboa = $('#taboa-deberes');
+    taboa.addEventListener('click', ev => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.matches('.dm')) {
+        const m = E.vista.filas[b.dataset.f].marcas[b.dataset.d];
+        marcaDeber(b, m === true ? false : m === false ? null : true);
+      } else if (b.dataset.todos) todosFeitos(E.vista.deberes[b.dataset.todos]);
+      else if (b.dataset.editarDeber) dialogoDeberes(E.vista.deberes[b.dataset.editarDeber], E.vista.avaliacion);
+    });
+    taboa.addEventListener('keydown', teclaDeber);
+    $('#aside').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-deberes]');
+      if (b) dialogoProbaDeberes(Number(b.dataset.deberes));
+    });
+  }
+
+  function teclaDeber(ev) {
+    const b = ev.target;
+    if (!b.matches('.dm')) return;
+    const f = Number(b.dataset.f), d = Number(b.dataset.d);
+    const vai = (df, dd) => {
+      const dest = $(`#taboa-deberes .dm[data-f="${f + df}"][data-d="${d + dd}"]`);
+      if (dest) dest.focus();
+    };
+    const k = ev.key.toLowerCase();
+    const movs = { arrowdown: [1, 0], arrowup: [-1, 0], arrowright: [0, 1], arrowleft: [0, -1] };
+    if (movs[k]) { ev.preventDefault(); vai(...movs[k]); return; }
+    const valor = ['s', 'f', '1', '+'].includes(k) ? true : ['n', '0', '-'].includes(k) ? false
+      : ['delete', 'backspace'].includes(k) ? null : undefined;
+    if (valor === undefined) return;
+    ev.preventDefault();
+    marcaDeber(b, valor);
+    vai(1, 0);
+  }
+
+  function pintaMarca(b, m) {
+    b.classList.toggle('si', m === true);
+    b.classList.toggle('non', m === false);
+    b.textContent = m === true ? '✓' : m === false ? '✗' : '';
+    b.setAttribute('aria-label', b.getAttribute('aria-label').replace(/: [^:]*$/, ': ' + (m === true ? 'feitos' : m === false ? 'non feitos' : 'sen marcar')));
+  }
+
+  function marcaDeber(b, valor) {
+    const v = E.vista;
+    const fila = v.filas[b.dataset.f];
+    const d = v.deberes[b.dataset.d];
+    fila.marcas[b.dataset.d] = valor; // ao momento; o servidor devolve despois os totais
+    pintaMarca(b, valor);
+    cola = cola.then(() => api('PUT', '/api/entregas', { deberes_id: d.id, alumno_id: fila.id, feito: valor }))
+      .then(actualizaDeberes)
+      .catch(e => { toast(e.message, true); navega(); });
+  }
+
+  async function todosFeitos(d) {
+    cola = cola.then(() => api('POST', `/api/deberes/${d.id}/todos`)).then(actualizaDeberes).catch(e => toast(e.message, true));
+  }
+
+  function actualizaDeberes(v) {
+    const vella = E.vista;
+    if (E.seccion !== 'deberes' || !vella || vella.clase.id !== v.clase.id || vella.avaliacion !== v.avaliacion) return;
+    E.vista = v;
+    const igual = $('#taboa-deberes') && vella.deberes.length === v.deberes.length && vella.filas.length === v.filas.length &&
+      vella.deberes.every((d, j) => d.id === v.deberes[j].id) && vella.filas.every((f, i) => f.id === v.filas[i].id);
+    if (!igual) return pintaVistaDeberes(v);
+    $$('#taboa-deberes tbody tr').forEach((tr, i) => {
+      const f = v.filas[i];
+      $$('.dm', tr).forEach((b, j) => pintaMarca(b, f.marcas[j]));
+      const r = resumoFila(f);
+      $('.rf', tr).textContent = r.feitos;
+      $('.rp', tr).innerHTML = `${barraPct(r.pct)}<span>${porcento(r.pct)}</span>`;
+      const rn = $('.rn', tr);
+      rn.textContent = r.nota;
+      rn.classList.toggle('malo', f.redondeada != null && f.redondeada < 5);
+      const nome = $('.name', tr);
+      nome.innerHTML = esc(f.nome) + (f.racha >= 2 ? ` <span class="racha" title="${f.racha} deberes seguidos sen facer">${f.racha}✗</span>` : '');
+    });
+    $$('#taboa-deberes tfoot .pc').forEach((td, j) => { td.textContent = porcento(v.deberes[j].porcentaxe); });
+    $$('#taboa-deberes [data-todos]').forEach((b, j) => { b.hidden = !v.deberes[j].pendentes; });
+    $('#cards').innerHTML = tarxetasDeberes(v);
+    $('#aside').innerHTML = asideDeberes(v);
+    $('#sub').innerHTML = subDeberes(v);
+  }
+
+  async function dialogoDeberes(d, av) {
+    const v = await dialogo({
+      titulo: d ? 'Editar deberes' : 'Deberes',
+      boton: d ? 'Gardar' : 'Engadir',
+      extra: d ? '<button type="button" class="btn perigo" data-eliminar style="margin-right:auto">Eliminar</button>' : '',
+      html: `<div class="fila3">
+          <label class="campo"><span>Día en que se pediron</span><input type="date" name="data" value="${esc(d ? d.data : hoxeIso())}" max="${hoxeIso()}"></label>
+          ${d ? '' : `<label class="campo"><span>Avaliación</span><select name="avaliacion">${[1, 2, 3].map(a =>
+            `<option value="${a}" ${a === av ? 'selected' : ''}>${NOMES_AV[a]}</option>`).join('')}</select></label>`}
+        </div>
+        <label class="campo"><span>Que se mandou <small>(opcional)</small></span><input name="descricion" maxlength="80" value="${esc(d ? d.descricion : '')}" placeholder="Exercicios da páx. 34" autocomplete="off"></label>
+        ${d ? '' : '<small class="faint">Aparece unha columna nova. Marca con un toque quen os fixo; se alguén faltou, déixao sen marcar e non lle conta.</small>'}`,
+      aoAbrir(form) {
+        const el = $('[data-eliminar]', form);
+        if (el) el.onclick = () => { $('#dlg').close(); eliminaDeberes(d); };
+      },
+      async aoEnviar(form) {
+        const corpo = { data: form.data.value, descricion: form.descricion.value };
+        if (d) return api('PUT', `/api/deberes/${d.id}`, corpo);
+        return api('POST', `/api/clases/${E.clase.id}/deberes`, { ...corpo, avaliacion: Number(form.avaliacion.value) });
+      },
+    });
+    if (!v) return;
+    toast(d ? 'Gardado' : 'Deberes engadidos');
+    if (E.seccion !== 'deberes' || E.ultimaAv !== String(v.avaliacion)) {
+      location.hash = href('deberes', String(v.avaliacion));
+      return;
+    }
+    E.vista = v;
+    pintaVistaDeberes(v);
+    // Listos para marcar: o foco vai á primeira cela da columna nova.
+    const j = d ? -1 : v.deberes.reduce((m, x, k) => (x.id > v.deberes[m].id ? k : m), 0);
+    const b = j >= 0 && $(`#taboa-deberes .dm[data-f="0"][data-d="${j}"]`);
+    if (b) { b.focus(); b.closest('td').scrollIntoView({ block: 'nearest', inline: 'center' }); }
+  }
+
+  async function eliminaDeberes(d) {
+    const marcados = E.vista.filas.filter(f => f.marcas[E.vista.deberes.indexOf(d)] != null).length;
+    if (!(await confirma('Eliminar deberes', `Eliminaranse os deberes do ${dataCurta(d.data)}${marcados ? ` e as ${plural(marcados, 'marca', 'marcas')}` : ''}. Non se pode desfacer.`, 'Eliminar'))) return;
+    try {
+      pintaVistaDeberes(E.vista = await api('DELETE', `/api/deberes/${d.id}`));
+      toast('Deberes eliminados');
+    } catch (e) { toast(e.message, true); }
+  }
+
+  // Crea a proba especial «Deberes» dunha avaliación: a súa nota sae das entregas e actualízase soa.
+  async function dialogoProbaDeberes(av) {
+    let lista, vd;
+    try {
+      [lista, vd] = await Promise.all([api('GET', `/api/clases/${E.clase.id}/probas`).then(d => d.probas),
+        api('GET', `/api/clases/${E.clase.id}/deberes/${av}`)]);
+    } catch (e) { return toast(e.message, true); }
+    const outras = lista.filter(q => q.avaliacion === av).reduce((s, q) => s + q.peso, 0);
+    const r = vd.resumo;
+    const estado = r.deberes
+      ? `Na ${NOMES_AV[av]} hai ${r.deberes === 1 ? 'uns deberes rexistrados' : r.deberes + ' deberes rexistrados'}; a clase fixo o ${porcento(r.porcentaxe)}.`
+      : `Na ${NOMES_AV[av]} aínda non hai deberes rexistrados: a nota irá aparecendo a medida que os marques.`;
+    return dialogo({
+      titulo: 'Levar os deberes ás notas',
+      boton: 'Crear a proba',
+      html: `<p style="margin:0">${estado}</p>
+        <div class="fila3">
+          <label class="campo"><span>Nome da proba</span><input name="nome" maxlength="40" value="Deberes" autocomplete="off"></label>
+          <label class="campo"><span>Peso (%)</span><input name="peso" inputmode="decimal" autocomplete="off" value="${outras < 100 ? num(100 - outras) : ''}"></label>
+        </div>
+        <small class="faint" id="info-peso"></small>
+        <ul class="regras"><li>Nota de cada alumno = deberes feitos ÷ deberes marcados × 10 (todos feitos: 10; a metade: 5).</li>
+          <li>Os días sen marcar non contan, nin a favor nin en contra.</li>
+          <li>Non se escribe a man: cambia soa cada vez que marcas deberes desta avaliación.</li></ul>`,
+      aoAbrir(form) {
+        const actualiza = () => {
+          const peso = leNum(form.peso.value);
+          const total = outras + (Number.isFinite(peso) ? peso : 0);
+          $('#info-peso', form).innerHTML = `Con esta proba, os pesos da ${NOMES_AV[av]} suman <b>${num(total)} %</b>` +
+            (sumaPesosOk(total) ? ' ✓' : ` (deberían sumar 100 %; quedan ${num(100 - outras)} %)`);
+        };
+        form.addEventListener('input', actualiza);
+        actualiza();
+      },
+      async aoEnviar(form) {
+        const peso = leNum(form.peso.value);
+        if (Number.isNaN(peso)) throw new Error('Revisa o peso (podes usar coma decimal).');
+        await api('POST', `/api/clases/${E.clase.id}/probas`, { deberes: true, nome: form.nome.value, avaliacion: av, peso });
+        toast('Proba de deberes creada');
+        navega();
       },
     });
   }
@@ -748,7 +1093,7 @@
       detalle = `<section class="box"><div class="cab-box"><h2>Por proba</h2></div><div class="scroll"><table><thead><tr>
         <th class="l" style="padding-left:14px">Proba</th><th>Peso</th><th>Media</th><th>Mín.</th><th>Máx.</th>
         <th>&lt; ${num(v.clase.minimo_proba)}</th><th>Pendentes</th></tr></thead><tbody>${va.probas.map(p => `<tr>
-        <td class="l name" style="padding-left:14px">${esc(p.nome)} <span class="faint">${TIPOS[p.tipo].toLowerCase()}</span></td><td>${num(p.peso)} %</td>
+        <td class="l name" style="padding-left:14px">${esc(p.nome)} <span class="faint">${tipoProba(p).toLowerCase()}</span></td><td>${num(p.peso)} %</td>
         <td><b>${num(p.media, 2)}</b></td><td>${num(p.minima, 2)}</td><td>${num(p.maxima, 2)}</td>
         <td class="${p.baixo ? 'malo' : 'muted'}">${p.baixo}</td><td class="${p.pendentes ? '' : 'muted'}">${p.pendentes}</td></tr>`).join('')}</tbody></table></div></section>`;
     } else {
@@ -1328,10 +1673,10 @@
     if (document.documentElement.classList.contains('mac')) {
       $$('header.top, header.top .row').forEach(el => el.classList.add('pywebview-drag-region'));
     }
+    // O selector de clase só se ve en pantallas estreitas (iPhone), onde non hai barra lateral.
     $('#sel-clase').onchange = ev => {
-      const id = Number(ev.target.value);
-      const arg = ['notas', 'estatisticas'].includes(E.seccion) ? E.ultimaAv : null;
-      location.hash = href(E.seccion === 'informe' ? 'notas' : E.seccion, arg, id);
+      const sec = E.seccion === 'informe' ? 'notas' : E.seccion;
+      location.hash = href(sec, argSeccion(sec), Number(ev.target.value));
     };
     // Na aplicación de Mac, Excel e informe ábrense no navegador (descargas e impresión).
     $('#b-xls').onclick = () => {
